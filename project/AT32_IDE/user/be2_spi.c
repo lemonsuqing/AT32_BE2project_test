@@ -61,38 +61,36 @@ static uint16_t be2_calculate_lrc(uint8_t *data, uint8_t len) {
 
 // 切换到命令模式（GOTO_COMMAND_MODE, CMD = 0x0006）
 bool be2_enter_command_mode(void) {
-    uint8_t tx[11];
+    uint8_t tx[9];
     tx[0] = 0x3A;
     tx[1] = 0x01; tx[2] = 0x00;  // Sensor ID
-    tx[3] = 0x06; tx[4] = 0x00;  // CMD: GOTO_COMMAND_MODE
-    tx[5] = 0x00; tx[6] = 0x00;  // Length = 0
-    uint16_t lrc = be2_calculate_lrc(&tx[1], 6);
-    tx[7] = lrc & 0xFF;
-    tx[8] = (lrc >> 8) & 0xFF;
-    tx[9] = 0x0D;
-    tx[10] = 0x0A;
+    tx[3] = 0x06; tx[4] = 0x00;  // CMD
+    tx[5] = 0x00; tx[6] = 0x00;  // Length 0
 
-    uint8_t rx[32] = {0};
+    uint8_t lrc = be2_calculate_lrc(&tx[1], 6);
+    tx[7] = lrc;
+    tx[8] = 0x0D;
+    // tx[9] = 0x0A;  // 这里可选加0x0A，注意帧尾
 
     LPMS_CS_LOW();
     wk_delay_us(5);
 
-    // Step 1: 发命令
-    for (int i = 0; i < 11; i++) {
+    // 发送9字节命令
+    for (int i = 0; i < 9; i++) {
         spi2_rw_byte(tx[i]);
     }
 
-    wk_delay_us(100);  // ⏳ 多给点响应准备时间
+    wk_delay_us(100);
 
-    // Step 2: 拉出响应
+    // 读取响应（最多32字节）
+    uint8_t rx[32] = {0};
     for (int i = 0; i < 32; i++) {
         rx[i] = spi2_rw_byte(0xFF);
-        if (i >= 1 && rx[i - 1] == 0x0D && rx[i] == 0x0A) {
-            break;  // 帧尾找到，停止读
+        if (i >= 1 && rx[i-1] == 0x0D && rx[i] == 0x0A) {
+            break;
         }
     }
 
-    wk_delay_us(5);
     LPMS_CS_HIGH();
     wk_delay_ms(10);
 
@@ -101,15 +99,14 @@ bool be2_enter_command_mode(void) {
         Serial_Printf("  rx[%02d] = 0x%02X\r\n", i, rx[i]);
     }
 
-    // Step 3: 判断响应是否合法
+    // 判断帧头和命令号
     if (rx[0] == 0x3A && rx[3] == 0x06) {
-        Serial_Printf("✅ Entered command mode.\r\n");
         return true;
-    } else {
-        Serial_Printf("❌ Command mode failed.\r\n");
-        return false;
     }
+
+    return false;
 }
+
 
 
 
