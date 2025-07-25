@@ -108,8 +108,11 @@ int main(void)
 
   // Step 1: Enter command mode
   Serial_Printf("Step 1: Enter Command Mode...\r\n");
-  be2_enter_command_mode();
-  Serial_Printf("✅ Entered command mode.\r\n");
+  if (be2_enter_command_mode()) {
+      Serial_Printf("✅ Entered command mode.\r\n");
+  } else {
+      Serial_Printf("❌ Failed to enter command mode.\r\n");
+  }
 
   // Step 2: Read WHO_AM_I (0x74)
   Serial_Printf("Step 2: Read WHO_AM_I (0x74)...\r\n");

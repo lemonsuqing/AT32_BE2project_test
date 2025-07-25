@@ -11,19 +11,30 @@
 uint8_t spi2_rw_byte(uint8_t byte) {
     Serial_Printf("[SPI] Send: 0x%02X\r\n", byte);
 
-    while (spi_i2s_flag_get(SPI2, SPI_I2S_TDBE_FLAG) == RESET)
-        Serial_Printf("[SPI] Wait TDBE...\r\n");
+    int timeout = 10000;
+    while (spi_i2s_flag_get(SPI2, SPI_I2S_TDBE_FLAG) == RESET && timeout--) {
+        // optionally delay or just spin
+    }
+    if (timeout <= 0) {
+        Serial_Printf("[SPI] ⛔ TDBE timeout!\r\n");
+        return 0xFF;
+    }
 
     spi_i2s_data_transmit(SPI2, byte);
 
-    while (spi_i2s_flag_get(SPI2, SPI_I2S_RDBF_FLAG) == RESET)
-        Serial_Printf("[SPI] Wait RDBF...\r\n");
+    timeout = 10000;
+    while (spi_i2s_flag_get(SPI2, SPI_I2S_RDBF_FLAG) == RESET && timeout--) {
+        // optionally delay or just spin
+    }
+    if (timeout <= 0) {
+        Serial_Printf("[SPI] ⛔ RDBF timeout!\r\n");
+        return 0xFF;
+    }
 
     uint8_t recv = spi_i2s_data_receive(SPI2);
     Serial_Printf("[SPI] Recv: 0x%02X\r\n", recv);
     return recv;
 }
-
 void be2_spi_init_cs_gpio(void) {
     gpio_init_type gpio_init_struct;
     crm_periph_clock_enable(CRM_GPIOC_PERIPH_CLOCK, TRUE);
@@ -49,7 +60,7 @@ static uint16_t be2_calculate_lrc(uint8_t *data, uint8_t len) {
 }
 
 // 切换到命令模式（GOTO_COMMAND_MODE, CMD = 0x0006）
-void be2_enter_command_mode(void) {
+bool be2_enter_command_mode(void) {
     uint8_t tx[11];
     tx[0] = 0x3A;
     tx[1] = 0x01; tx[2] = 0x00;  // Sensor ID
@@ -62,12 +73,20 @@ void be2_enter_command_mode(void) {
 
     LPMS_CS_LOW();
     wk_delay_us(5);
+
+    bool ok = true;
     for (int i = 0; i < 11; i++) {
-        spi2_rw_byte(tx[i]);
+        uint8_t resp = spi2_rw_byte(tx[i]);
+        if (resp == 0x00 && i == 0) {
+            ok = false;  // 发第一个字节时如果返回 0x00，说明设备无响应
+        }
     }
+
     wk_delay_us(5);
     LPMS_CS_HIGH();
     wk_delay_ms(100);
+
+    return ok;
 }
 
 // 读取 WHO_AM_I（地址 0x74）对应 LPBUS 指令: READ_REGISTER(0x000B)，Length=2, Param=0x74 0x00
