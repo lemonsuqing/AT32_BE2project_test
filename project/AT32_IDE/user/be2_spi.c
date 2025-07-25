@@ -65,38 +65,51 @@ bool be2_enter_command_mode(void) {
     tx[0] = 0x3A;
     tx[1] = 0x01; tx[2] = 0x00;  // Sensor ID
     tx[3] = 0x06; tx[4] = 0x00;  // CMD: GOTO_COMMAND_MODE
-    tx[5] = 0x00; tx[6] = 0x00;  // Payload Length = 0
+    tx[5] = 0x00; tx[6] = 0x00;  // Length
     uint16_t lrc = be2_calculate_lrc(&tx[1], 6);
     tx[7] = lrc & 0xFF;
     tx[8] = (lrc >> 8) & 0xFF;
-    tx[9] = 0x0D; tx[10] = 0x0A;
+    tx[9] = 0x0D;
+    tx[10] = 0x0A;
 
-    uint8_t rx[11] = {0};
+    uint8_t rx[32] = {0}; // 大一点以防完整响应帧
 
     LPMS_CS_LOW();
     wk_delay_us(5);
 
+    // Step 1: 发命令
     for (int i = 0; i < 11; i++) {
-        rx[i] = spi2_rw_byte(tx[i]);
+        spi2_rw_byte(tx[i]); // 不记录返回，发送阶段只发
+    }
+
+    wk_delay_us(50); // 等设备响应帧准备（关键）
+
+    // Step 2: 拉出响应（dummy byte）
+    for (int i = 0; i < 20; i++) {
+        rx[i] = spi2_rw_byte(0xFF);
+        if (i >= 1 && rx[i - 1] == 0x0D && rx[i] == 0x0A) {
+            // 响应帧结束标志 0x0D 0x0A
+            break;
+        }
     }
 
     wk_delay_us(5);
     LPMS_CS_HIGH();
-    wk_delay_ms(100);
+    wk_delay_ms(10);
 
-    // 检查回应是否符合预期，比如是否收到 echo 头：rx[0] == 0x3A
+    // Step 3: 判断响应是否是 0x3A + 0x06
     if (rx[0] == 0x3A && rx[3] == 0x06) {
         Serial_Printf("✅ Entered command mode.\r\n");
         return true;
     } else {
-        Serial_Printf("❌ Command mode failed. Response: ");
-        for (int i = 0; i < 11; i++) {
-            Serial_Printf("%02X ", rx[i]);
+        Serial_Printf("❌ Command mode failed. Response:\r\n");
+        for (int i = 0; i < 20; i++) {
+            Serial_Printf("  rx[%02d] = 0x%02X\r\n", i, rx[i]);
         }
-        Serial_Printf("\r\n");
         return false;
     }
 }
+
 
 
 // 读取 WHO_AM_I（地址 0x74）对应 LPBUS 指令: READ_REGISTER(0x000B)，Length=2, Param=0x74 0x00
