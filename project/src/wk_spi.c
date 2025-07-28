@@ -120,34 +120,26 @@ void spi2_cs_disable(void) {
 uint8_t spi2_read_write_byte(uint8_t data) {
     uint32_t timeout = 100000;
 
-    // 检查SPI状态 - 使用正确的标志名
-    if(spi_i2s_flag_get(SPI2, SPI_I2S_TDBE_FLAG) == RESET) {
-    	Serial_Printf("SPI TX buffer not empty!\r\n");
-    }
-
     // 等待发送缓冲区为空
     while (spi_i2s_flag_get(SPI2, SPI_I2S_TDBE_FLAG) == RESET) {
         if (--timeout == 0) {
-        	Serial_Printf("SPI TX timeout! Status: 0x%04X\r\n", SPI2->sts);
+            Serial_Printf("SPI TX timeout! Status: 0x%04X\r\n", SPI2->sts);
             return 0xFF;
         }
     }
 
     // 发送数据
     spi_i2s_data_transmit(SPI2, data);
-    Serial_Printf("SPI Sent: 0x%02X\r\n", data);
 
     timeout = 100000;
     // 等待接收缓冲区有数据
     while (spi_i2s_flag_get(SPI2, SPI_I2S_RDBF_FLAG) == RESET) {
         if (--timeout == 0) {
-        	Serial_Printf("SPI RX timeout! Status: 0x%04X\r\n", SPI2->sts);
+            Serial_Printf("SPI RX timeout! Status: 0x%04X\r\n", SPI2->sts);
             return 0xFF;
         }
     }
 
-    uint8_t ret = spi_i2s_data_receive(SPI2);
-    Serial_Printf("SPI Received: 0x%02X\r\n", ret);
-    return ret;
+    return spi_i2s_data_receive(SPI2);
 }
 /* add user code end 1 */

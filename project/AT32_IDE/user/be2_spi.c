@@ -5,129 +5,168 @@
 #include <string.h>
 #include <math.h>
 
-// 初始化传感器
-void be2_spi_init(void) {
-    // 重置传感器
-	be2_write_register(BE2_REG_SYS_CONFIG, 0x80);
-	wk_delay_ms(100);
-
-	// 验证设备ID (应为0x32)
-	uint8_t who_am_i = be2_read_register(BE2_REG_WHO_AM_I);
-	if(who_am_i != 0x32) {
-		// 打印错误信息而不是死循环
-		Serial_Printf("Error: Incorrect device ID. Expected 0x32, got 0x%02X\r\n", who_am_i);
-		// 继续初始化，但数据可能不可靠
-	} else {
-		Serial_Printf("Device ID verified: 0x%02X\r\n", who_am_i);
-	}
-
-//    // 验证设备ID (应为0x32)
-//    if(be2_read_register(BE2_REG_WHO_AM_I) != 0x32) {
-//        // 设备ID错误
-//        while(1);
-//    }
-
-    // 配置数据输出 (使能时间戳、加速度、陀螺仪、四元数、欧拉角)
-    be2_write_register(BE2_REG_DATA_ENABLE, 0x7F); // 0b01111111
-
-    // 设置加速度范围 ±4g (默认)
-    be2_write_register(BE2_REG_CTRL_0_A, 0x04);
-
-    // 设置陀螺仪范围 ±2000dps (默认)
-    be2_write_register(BE2_REG_CTRL_1_G, 0x10);
-
-    // 设置输出频率 100Hz
-    be2_write_register(BE2_REG_DATA_CTRL, 0x03);
-
-    // 设置卡尔曼滤波 (默认)
-    be2_write_register(BE2_REG_FILTER_CONFIG, 0x01);
-
-    // 启动传感器
-    be2_write_register(BE2_REG_SYS_CONFIG, 0x00);
+// 底层SPI传输函数
+uint8_t be2_transfer_byte(uint8_t data) {
+    spi2_cs_enable();
+    uint8_t ret = spi2_read_write_byte(data);
+    spi2_cs_disable();
+    return ret;
 }
 
-// 读取单个寄存器
-uint8_t be2_read_register(uint8_t reg) {
-	uint8_t value;
-
-	spi2_cs_enable();
-
-	// 发送读命令 (RW=1) 和寄存器地址
-	uint8_t cmd = (1 << 7) | reg;
-	printf("SPI Read CMD: 0x%02X\r\n", cmd);
-	uint8_t received = spi2_read_write_byte(cmd);
-
-	// 接收数据 (发送dummy字节)
-	value = spi2_read_write_byte(0xFF);
-	printf("SPI Read Reg 0x%02X, Value: 0x%02X\r\n", reg, value);
-
-	spi2_cs_disable();
-
-	return value;
+// CRC校验计算（简单异或）
+uint8_t calculate_crc(uint8_t *data, uint8_t len) {
+    uint8_t crc = 0;
+    for(uint8_t i = 0; i < len; i++) {
+        crc ^= data[i];
+    }
+    return crc;
 }
 
-// 写入单个寄存器
+// 写入寄存器（仅保留复位所需功能）
 void be2_write_register(uint8_t reg, uint8_t value) {
     spi2_cs_enable();
-
-    // 发送写命令 (RW=0) 和寄存器地址
-    spi2_read_write_byte(reg & 0x7F); // RW=0
-    // 发送数据
+    spi2_read_write_byte(reg & 0x7F);  // 写命令（最高位为0）
     spi2_read_write_byte(value);
-
     spi2_cs_disable();
+    wk_delay_us(50);  // 等待写入完成
 }
 
-// 读取32位数据
-uint32_t be2_read_32bit(uint8_t reg) {
-    uint32_t value = 0;
-
+// 读取寄存器（仅作兼容保留）
+uint8_t be2_read_register(uint8_t reg) {
+    uint8_t value;
     spi2_cs_enable();
-
-    // 发送读命令和起始地址
-    spi2_read_write_byte((1 << 7) | reg);
-
-    // 读取4个字节 (小端格式)
-    value |= spi2_read_write_byte(0xFF);
-    value |= spi2_read_write_byte(0xFF) << 8;
-    value |= spi2_read_write_byte(0xFF) << 16;
-    value |= spi2_read_write_byte(0xFF) << 24;
-
+    spi2_read_write_byte((1 << 7) | reg);  // 读命令（最高位为1）
+    value = spi2_read_write_byte(0xFF);    // 读取数据
     spi2_cs_disable();
-
     return value;
 }
 
-// 读取浮点数
+// 进入命令模式
+bool be2_enter_command_mode(void) {
+    // 命令帧结构：3A 01 00 06 00 00 00 F1
+    uint8_t cmd_frame[] = {
+        LPBUS_HEADER,
+        CMD_ENTER_COMMAND_MODE,
+        0x00,         // 设备地址
+        0x06,         // 数据长度
+        0x00, 0x00, 0x00,  // 数据域
+        0xF1          // CRC校验
+    };
+    uint8_t response[8] = {0};
+
+    // 发送命令帧
+    spi2_cs_enable();
+    for(uint8_t i = 0; i < 8; i++) {
+        spi2_read_write_byte(cmd_frame[i]);
+    }
+    spi2_cs_disable();
+    wk_delay_ms(10);  // 等待传感器响应
+
+    // 读取响应帧
+    spi2_cs_enable();
+    for(uint8_t i = 0; i < 8; i++) {
+        response[i] = spi2_read_write_byte(0xFF);
+    }
+    spi2_cs_disable();
+
+    // 验证响应是否有效
+    if(response[0] != LPBUS_HEADER) {
+        Serial_Printf("Command mode failed: invalid header (0x%02X)\r\n", response[0]);
+        return false;
+    }
+
+    if(response[7] != calculate_crc(response, 7)) {
+        Serial_Printf("Command mode failed: CRC mismatch\r\n");
+        return false;
+    }
+
+    return true;
+}
+
+// 读取欧拉角数据
+bool be2_read_euler(BE2_Data *data) {
+    // 读欧拉角命令帧
+    uint8_t cmd_frame[] = {
+        LPBUS_HEADER,
+        CMD_READ_EULER,
+        0x00,         // 设备地址
+        0x03,         // 数据长度
+        0x05, 0x00, 0x00,  // 数据域（指定欧拉角）
+        0x00          // CRC占位
+    };
+    // 计算CRC
+    cmd_frame[8] = calculate_crc(cmd_frame, 8);
+
+    // 发送命令
+    spi2_cs_enable();
+    for(uint8_t i = 0; i < 9; i++) {
+        spi2_read_write_byte(cmd_frame[i]);
+    }
+    spi2_cs_disable();
+    wk_delay_ms(10);  // 等待数据准备
+
+    // 读取响应（16字节）
+    uint8_t response[16] = {0};
+    spi2_cs_enable();
+    for(uint8_t i = 0; i < 16; i++) {
+        response[i] = spi2_read_write_byte(0xFF);
+    }
+    spi2_cs_disable();
+
+    // 验证响应
+    if(response[0] != LPBUS_HEADER) {
+        Serial_Printf("Euler read failed: invalid header\r\n");
+        return false;
+    }
+
+    if(response[15] != calculate_crc(response, 15)) {
+        Serial_Printf("Euler read failed: CRC mismatch\r\n");
+        return false;
+    }
+
+    // 解析欧拉角（小端格式）
+    data->euler[0] = *(float*)&response[4];  // Roll (4-7字节)
+    data->euler[1] = *(float*)&response[8];  // Pitch (8-11字节)
+    data->euler[2] = *(float*)&response[12]; // Yaw (12-15字节)
+
+    return true;
+}
+
+// 初始化传感器
+void be2_spi_init(void) {
+    Serial_Printf("Initializing BE2 sensor...\r\n");
+
+    // 复位传感器
+    be2_write_register(BE2_REG_SYS_CONFIG, 0x80);
+    wk_delay_ms(200);  // 延长复位等待时间
+
+    // 进入命令模式（关键步骤）
+    if(be2_enter_command_mode()) {
+        Serial_Printf("Successfully entered command mode\r\n");
+    } else {
+        Serial_Printf("Failed to enter command mode - check connections\r\n");
+    }
+}
+
+// 读取32位数据（兼容保留）
+uint32_t be2_read_32bit(uint8_t reg) {
+    Serial_Printf("Warning: Direct 32bit read not supported\r\n");
+    return 0;
+}
+
+// 读取浮点数（兼容保留）
 float be2_read_float(uint8_t reg) {
-    uint32_t raw = be2_read_32bit(reg);
-    return *((float*)&raw);
+    Serial_Printf("Warning: Direct float read not supported\r\n");
+    return 0.0f;
 }
 
 // 读取完整传感器数据
 void be2_read_data(BE2_Data *data) {
-    // 时间戳 (单位: 0.002秒)
-    uint32_t timestamp_raw = be2_read_32bit(BE2_REG_TIMESTAMP);
-    data->timestamp = timestamp_raw * 0.002f;
-
-    // 加速度
-    data->acc[0] = be2_read_float(BE2_REG_ACC_X);
-    data->acc[1] = be2_read_float(BE2_REG_ACC_Y);
-    data->acc[2] = be2_read_float(BE2_REG_ACC_Z);
-
-    // 陀螺仪
-    data->gyro[0] = be2_read_float(BE2_REG_GYR_X);
-    data->gyro[1] = be2_read_float(BE2_REG_GYR_Y);
-    data->gyro[2] = be2_read_float(BE2_REG_GYR_Z);
-
-    // 四元数
-    data->quaternion[0] = be2_read_float(BE2_REG_QUAT_W); // w
-    data->quaternion[1] = be2_read_float(BE2_REG_QUAT_X); // x
-    data->quaternion[2] = be2_read_float(BE2_REG_QUAT_Y); // y
-    data->quaternion[3] = be2_read_float(BE2_REG_QUAT_Z); // z
-
-    // 欧拉角
-    data->euler[0] = be2_read_float(BE2_REG_EULER_X); // roll
-    data->euler[1] = be2_read_float(BE2_REG_EULER_Y); // pitch
-    data->euler[2] = be2_read_float(BE2_REG_EULER_Z); // yaw
+    // 仅读取欧拉角（可扩展其他数据）
+    if(!be2_read_euler(data)) {
+        // 读取失败时清零
+        data->euler[0] = 0.0f;
+        data->euler[1] = 0.0f;
+        data->euler[2] = 0.0f;
+    }
 }

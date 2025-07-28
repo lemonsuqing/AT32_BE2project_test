@@ -34,6 +34,16 @@
 #define BE2_REG_FIRMWARE_VERSION_0   0x75
 #define BE2_REG_FIRMWARE_VERSION_1   0x76
 
+// LP-BUS协议定义
+#define LPBUS_HEADER 0x3A  // 帧头标识
+
+// 命令类型
+#define CMD_ENTER_COMMAND_MODE 0x01  // 进入命令模式
+#define CMD_READ_EULER         0x02  // 读取欧拉角
+
+// 寄存器定义（仅保留必要的）
+#define BE2_REG_SYS_CONFIG 0x02  // 系统配置寄存器
+
 // 传感器数据结构
 typedef struct {
     float timestamp;         // 时间戳 (秒)
@@ -50,6 +60,10 @@ uint8_t be2_read_register(uint8_t reg);
 void be2_write_register(uint8_t reg, uint8_t value);
 uint32_t be2_read_32bit(uint8_t reg);
 float be2_read_float(uint8_t reg);
+bool be2_enter_command_mode(void);
+bool be2_read_euler(BE2_Data *data);
+uint8_t be2_transfer_byte(uint8_t data);
+uint8_t calculate_crc(uint8_t *data, uint8_t len);
 
 
 #endif
