@@ -52,22 +52,22 @@ bool lpms_enter_command_mode(void) {
 	    uint8_t tx[32] = {0};
 	    uint8_t valid = 0;
 
-	    // 发送进入命令模式命令
 	    spi_write_buf_debug(cmd, rx, sizeof(cmd));
 	    print_buffer("[CMD Mode TX]", cmd, sizeof(cmd));
 	    print_buffer("[CMD Mode RX]", rx, sizeof(cmd));
 
-	    wk_delay_ms(5);
+	    wk_delay_ms(50); // 增加延时
 
-	    // 连续读取多次数据，尝试获得有效响应
-	    for (int i = 0; i < 5; i++) {
+	    for (int i = 0; i < 10; i++) { // 多次读，扩大尝试次数
 	        spi_write_buf_debug(tx, rx, 32);
 	        print_buffer("[CMD Mode Read RX]", rx, 32);
+
 	        if (rx[0] == 0x3A && rx[31] == 0xF1) {
 	            valid = 1;
 	            break;
 	        }
-	        wk_delay_ms(5);
+
+	        wk_delay_ms(10);
 	    }
 
 	    return valid == 1;
