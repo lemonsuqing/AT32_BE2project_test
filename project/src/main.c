@@ -109,25 +109,54 @@ int main(void)
 
   BE2_I2C_Init();    // 初始化BE2的I2C通信
   wk_delay_ms(100);  // 等待传感器上电稳定
-  if(BE2_Init() != 0)
+
+  for (uint8_t addr = 3; addr < 0x78; addr++)
   {
-	Serial_Printf("Sensor init failed!\r\n");
-	while(1);  // 初始化失败时阻塞
+      // 设定地址和写模式
+      i2c_transfer_addr_set(I2C1, addr);
+      i2c_transfer_dir_set(I2C1, I2C_DIR_TRANSMIT);
+
+      // 生成起始信号
+      i2c_start_generate(I2C1);
+
+      // 等待ADDR发送完成
+      while(i2c_flag_get(I2C1, I2C_ADDRF_FLAG) == RESET)
+      {
+          // 可以设置超时避免死循环
+      }
+
+      // 检测是否收到ACK（无ACK即失败）
+      if (!i2c_flag_get(I2C1, I2C_ACKFAIL_FLAG))
+      {
+          // 有设备响应
+          printf("Found device at address 0x%02X\r\n", addr);
+      }
+
+      // 发送停止信号，清理状态
+      i2c_stop_generate(I2C1);
+
+      // 清除标志位
+      i2c_flag_clear(I2C1, I2C_ADDRF_FLAG | I2C_ACKFAIL_FLAG);
   }
+//  if(BE2_Init() != 0)
+//  {
+//	Serial_Printf("Sensor init failed!\r\n");
+//	while(1);  // 初始化失败时阻塞
+//  }
 
   /* add user code end 2 */
 
   while(1)
   {
     /* add user code begin 3 */
-  if(BE2_ReadAllData(&sensor_data) == 0)  // 读取传感器数据
-  {
-	BE2_PrintData(&sensor_data);  // 通过串口打印数据
-  }
-  else
-  {
-	Serial_Printf("Data read failed!\r\n");
-  }
+//  if(BE2_ReadAllData(&sensor_data) == 0)  // 读取传感器数据
+//  {
+//	BE2_PrintData(&sensor_data);  // 通过串口打印数据
+//  }
+//  else
+//  {
+//	Serial_Printf("Data read failed!\r\n");
+//  }
   wk_delay_ms(200);  // 控制读取频率（与手册中默认100Hz输出兼容）
     /* add user code end 3 */
   }
