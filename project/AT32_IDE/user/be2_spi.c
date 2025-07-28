@@ -15,10 +15,10 @@ void be2_spi_init(void) {
 	uint8_t who_am_i = be2_read_register(BE2_REG_WHO_AM_I);
 	if(who_am_i != 0x32) {
 		// 打印错误信息而不是死循环
-		printf("Error: Incorrect device ID. Expected 0x32, got 0x%02X\r\n", who_am_i);
+		Serial_Printf("Error: Incorrect device ID. Expected 0x32, got 0x%02X\r\n", who_am_i);
 		// 继续初始化，但数据可能不可靠
 	} else {
-		printf("Device ID verified: 0x%02X\r\n", who_am_i);
+		Serial_Printf("Device ID verified: 0x%02X\r\n", who_am_i);
 	}
 
 //    // 验证设备ID (应为0x32)
