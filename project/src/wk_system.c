@@ -38,7 +38,7 @@ volatile uint32_t ticks_count_us;
   * @param  delay: specifies the delay time length, in microsecond.
   * @retval none
   */
-static void delay_us(uint32_t delay)
+void delay_us(uint32_t delay)
 {
   uint32_t delay_ticks, pre_ticks, cur_ticks, delta;
   delay_ticks = delay * ticks_count_us;
@@ -98,14 +98,3 @@ __WEAK void wk_timebase_init(void)
   SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk;
 }
 
-void wk_delay_us(uint32_t us)
-{
-    uint32_t ticks = us * (system_core_clock / 1000000) / 8; // systick 8 ·ÖÆµ
-    SysTick->LOAD  = ticks;
-    SysTick->VAL   = 0;
-    SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk;
-
-    while (!(SysTick->CTRL & SysTick_CTRL_COUNTFLAG_Msk));
-
-    SysTick->CTRL &= ~SysTick_CTRL_ENABLE_Msk;
-}

@@ -226,15 +226,15 @@ void SysTick_Handler(void)
   * @param  none
   * @retval none
   */
-//void USART1_IRQHandler(void)
-//{
-//  /* add user code begin USART1_IRQ 0 */
+void USART1_IRQHandler(void)
+{
+  /* add user code begin USART1_IRQ 0 */
 //
 //  /* add user code end USART1_IRQ 0 */
-//  /* add user code begin USART1_IRQ 1 */
+  /* add user code begin USART1_IRQ 1 */
 //
 //  /* add user code end USART1_IRQ 1 */
-//}
+}
 
 /* add user code begin 1 */
 

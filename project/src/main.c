@@ -26,8 +26,10 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "at32f402_405_wk_config.h"
+#include "wk_i2c.h"
 #include "wk_spi.h"
 #include "wk_usart.h"
+#include "wk_gpio.h"
 #include "wk_system.h"
 
 /* private includes ----------------------------------------------------------*/
@@ -90,27 +92,33 @@ int main(void)
   wk_timebase_init();
 
   /* init usart1 function. */
-  wk_usart1_init();Serial_Printf("System initialized. Starting LPMS-BE2 test...\r\n");
+  wk_usart1_init();
 
   /* init spi2 function. */
-  wk_spi2_init();Serial_Printf("SPI2 initialized.\r\n");
+  wk_spi2_init();
+
+  /* init i2c2 function. */
+  wk_i2c2_init();
+
+  /* init gpio function. */
+  wk_gpio_config();
 
   /* add user code begin 2 */
   wk_delay_ms(100);
 
-  Serial_Printf("SPI write test...\r\n");
-  spi2_cs_enable();
-  uint8_t ret = spi2_read_write_byte(0x03);
-  spi2_cs_disable();
-  Serial_Printf("Test SPI returned: 0x%02X\r\n", ret);
-
-  Serial_Printf("Reading WHO_AM_I...\r\n");
-  uint8_t who = 0;
-  if (be2_read_register(0x74, &who)) {
-      Serial_Printf("WHO_AM_I = 0x%02X\r\n", who);
-  } else {
-      Serial_Printf("Failed to read WHO_AM_I\r\n");
-  }
+//  Serial_Printf("SPI write test...\r\n");
+//  spi2_cs_enable();
+//  uint8_t ret = spi2_read_write_byte(0x03);
+//  spi2_cs_disable();
+//  Serial_Printf("Test SPI returned: 0x%02X\r\n", ret);
+//
+//  Serial_Printf("Reading WHO_AM_I...\r\n");
+//  uint8_t who = 0;
+//  if (be2_read_register(0x74, &who)) {
+//      Serial_Printf("WHO_AM_I = 0x%02X\r\n", who);
+//  } else {
+//      Serial_Printf("Failed to read WHO_AM_I\r\n");
+//  }
 
     // 初始化传感器（使用LP-BUS协议）
 //    be2_spi_init();

@@ -11,6 +11,15 @@
             <ModeSub name="SWO" value="TRUE"/>
         </Mode>
     </DEBUG>
+    <I2C2>
+        <Mode>
+            <ModeSub name="I2C" value="I2C"/>
+        </Mode>
+        <Parameters>
+            <ParametersSub name="Timing_Configuration_Value" value="0x90F02F2F"/>
+            <ParametersSub name="DualAddressMode" value="DISABLE"/>
+        </Parameters>
+    </I2C2>
     <SPI2>
         <Mode>
             <ModeSub name="Mode" value="Full_Duplex_Master"/>
@@ -40,6 +49,8 @@
         <SysTick_Handler>1;15;0;0;0</SysTick_Handler>
         <FLASH_IRQHandler>0;0;0;0;0</FLASH_IRQHandler>
         <CRM_IRQHandler>0;0;0;0;0</CRM_IRQHandler>
+        <I2C2_EVT_IRQHandler>0;0;0;0;0</I2C2_EVT_IRQHandler>
+        <I2C2_ERR_IRQHandler>0;0;0;0;0</I2C2_ERR_IRQHandler>
         <SPI2_IRQHandler>0;0;0;0;0</SPI2_IRQHandler>
         <USART1_IRQHandler>1;0;0;0;0</USART1_IRQHandler>
         <FPU_IRQHandler>0;0;0;0;0</FPU_IRQHandler>
@@ -72,6 +83,8 @@
     <PINInfo>
         <PinSub pinname="PC1" signalname="SPI2_MOSI" signaltype="2"/>
         <PinSub pinname="PC2" signalname="SPI2_MISO" signaltype="2"/>
+        <PinSub pinname="PA0" signalname="I2C2_SCL" signaltype="2"/>
+        <PinSub pinname="PA1" signalname="I2C2_SDA" signaltype="2"/>
         <PinSub pinname="PB1" signalname="SPI2_SCK" signaltype="2"/>
         <PinSub pinname="PA9" signalname="USART1_TX" signaltype="2"/>
         <PinSub pinname="PA10" signalname="USART1_RX" signaltype="2"/>
@@ -85,7 +98,7 @@
         <ToolchainIDE>AT32_IDE</ToolchainIDE>
         <ARMCompiler>0</ARMCompiler>
         <KeepUserCode>true</KeepUserCode>
-        <NotUsedPinAnalog>false</NotUsedPinAnalog>
+        <NotUsedPinAnalog>true</NotUsedPinAnalog>
         <CodeSplitIP>true</CodeSplitIP>
         <AddNecessaryFileFlag>false</AddNecessaryFileFlag>
         <MinHeapSize>0x200</MinHeapSize>
