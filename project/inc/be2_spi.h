@@ -56,7 +56,7 @@ typedef struct {
 // º¯ÊıÉùÃ÷
 void be2_spi_init(void);
 void be2_read_data(BE2_Data *data);
-uint8_t be2_read_register(uint8_t reg);
+bool be2_read_register(uint8_t reg_addr, uint8_t *out_value);
 void be2_write_register(uint8_t reg, uint8_t value);
 uint32_t be2_read_32bit(uint8_t reg);
 float be2_read_float(uint8_t reg);

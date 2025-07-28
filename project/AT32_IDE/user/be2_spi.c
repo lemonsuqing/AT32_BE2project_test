@@ -33,39 +33,40 @@ void be2_write_register(uint8_t reg, uint8_t value) {
 }
 
 // 读取寄存器（仅作兼容保留）
-uint8_t be2_read_register(uint8_t reg_addr)
+bool be2_read_register(uint8_t reg_addr, uint8_t *out_value)
 {
+    // 发送命令帧
     uint8_t tx_buf[10] = {
-        0x3A,       // Header
-        0x01,       // Read command
-        0x00,       // Reserved
-        0x06,       // Payload length
-        reg_addr,   // Register address (e.g., 0x74)
-        0x00, 0x00, 0x00, 0x00, 0x00 // Padding
+        0x3A, 0x01, 0x00, 0x06, reg_addr,
+        0x00, 0x00, 0x00, 0x00, 0x00
     };
-
-    uint8_t rx_buf[10] = {0};
-
     spi2_cs_enable();
     for (int i = 0; i < 10; i++)
-    {
-        rx_buf[i] = spi2_read_write_byte(tx_buf[i]);
-    }
+        spi2_read_write_byte(tx_buf[i]);
     spi2_cs_disable();
 
-    wk_delay_ms(10); // 等待响应帧到来
+    wk_delay_ms(20); // 更保险
 
-    // 读取响应帧：通常为 16 字节或以上
+    // 读取响应帧
     uint8_t resp[16] = {0};
     spi2_cs_enable();
     for (int i = 0; i < 16; i++)
-    {
         resp[i] = spi2_read_write_byte(0xFF);
-    }
     spi2_cs_disable();
 
-    // 响应数据在 resp[4] 之后
-    return resp[4];  // WHO_AM_I 应该在这里返回 0x62 等
+    // 打印整个响应帧
+    Serial_Printf("Response Frame: ");
+    for (int i = 0; i < 16; i++)
+        Serial_Printf("%02X ", resp[i]);
+    Serial_Printf("\r\n");
+
+    // 判断帧合法性
+    if (resp[0] == 0x3A && resp[1] == 0x81) {
+        *out_value = resp[4]; // 取 payload[0]
+        return true;
+    }
+
+    return false;
 }
 
 // 进入命令模式

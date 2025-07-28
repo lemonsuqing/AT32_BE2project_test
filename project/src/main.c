@@ -105,8 +105,12 @@ int main(void)
   Serial_Printf("Test SPI returned: 0x%02X\r\n", ret);
 
   Serial_Printf("Reading WHO_AM_I...\r\n");
-  uint8_t who = be2_read_register(0x74);
-  Serial_Printf("WHO_AM_I = 0x%02X\r\n", who);
+  uint8_t who = 0;
+  if (be2_read_register(0x74, &who)) {
+      Serial_Printf("WHO_AM_I = 0x%02X\r\n", who);
+  } else {
+      Serial_Printf("Failed to read WHO_AM_I\r\n");
+  }
 
     // 初始化传感器（使用LP-BUS协议）
 //    be2_spi_init();
