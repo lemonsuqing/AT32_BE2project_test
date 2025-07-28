@@ -118,28 +118,31 @@ void spi2_cs_disable(void) {
 }
 
 uint8_t spi2_read_write_byte(uint8_t data) {
-    uint32_t timeout = 100000;
+    uint32_t timeout = 10000;  // 缩短超时计数（避免长时间等待）
 
-    // 等待发送缓冲区为空
+    // 等待发送缓冲区空
     while (spi_i2s_flag_get(SPI2, SPI_I2S_TDBE_FLAG) == RESET) {
         if (--timeout == 0) {
-            Serial_Printf("SPI TX timeout! Status: 0x%04X\r\n", SPI2->sts);
-            return 0xFF;
+            Serial_Printf("SPI TX timeout! STS:0x%04X\r\n", SPI2->sts);
+            return 0xFF;  // 超时返回错误值，不卡死
         }
     }
 
     // 发送数据
     spi_i2s_data_transmit(SPI2, data);
+    // Serial_Printf("SPI Sent: 0x%02X\r\n", data);  // 注释调试打印，避免拖慢时序
 
-    timeout = 100000;
+    timeout = 10000;
     // 等待接收缓冲区有数据
     while (spi_i2s_flag_get(SPI2, SPI_I2S_RDBF_FLAG) == RESET) {
         if (--timeout == 0) {
-            Serial_Printf("SPI RX timeout! Status: 0x%04X\r\n", SPI2->sts);
-            return 0xFF;
+            Serial_Printf("SPI RX timeout! STS:0x%04X\r\n", SPI2->sts);
+            return 0xFF;  // 超时返回错误值，不卡死
         }
     }
 
-    return spi_i2s_data_receive(SPI2);
+    uint8_t ret = spi_i2s_data_receive(SPI2);
+    // Serial_Printf("SPI Received: 0x%02X\r\n", ret);  // 注释调试打印
+    return ret;
 }
 /* add user code end 1 */

@@ -24,6 +24,7 @@ uint8_t calculate_crc(uint8_t *data, uint8_t len) {
 
 // 写入寄存器（仅保留复位所需功能）
 void be2_write_register(uint8_t reg, uint8_t value) {
+	Serial_Printf("Writing reg 0x%02X = 0x%02X...\r\n", reg, value);  // 标记步骤
     spi2_cs_enable();
     spi2_read_write_byte(reg & 0x7F);  // 写命令（最高位为0）
     spi2_read_write_byte(value);
@@ -33,6 +34,7 @@ void be2_write_register(uint8_t reg, uint8_t value) {
 
 // 读取寄存器（仅作兼容保留）
 uint8_t be2_read_register(uint8_t reg) {
+	Serial_Printf("Reading reg 0x%02X...\r\n", reg);  // 标记步骤
     uint8_t value;
     spi2_cs_enable();
     spi2_read_write_byte((1 << 7) | reg);  // 读命令（最高位为1）
@@ -44,43 +46,47 @@ uint8_t be2_read_register(uint8_t reg) {
 // 进入命令模式
 bool be2_enter_command_mode(void) {
     // 命令帧结构：3A 01 00 06 00 00 00 F1
-    uint8_t cmd_frame[] = {
-        LPBUS_HEADER,
-        CMD_ENTER_COMMAND_MODE,
-        0x00,         // 设备地址
-        0x06,         // 数据长度
-        0x00, 0x00, 0x00,  // 数据域
-        0xF1          // CRC校验
-    };
-    uint8_t response[8] = {0};
+	Serial_Printf("Trying to enter command mode...\r\n");  // 标记步骤
+	    uint8_t cmd_frame[] = {
+	        LPBUS_HEADER, CMD_ENTER_COMMAND_MODE, 0x00, 0x06, 0x00, 0x00, 0x00, 0xF1
+	    };
+	    uint8_t response[8] = {0};
 
-    // 发送命令帧
-    spi2_cs_enable();
-    for(uint8_t i = 0; i < 8; i++) {
-        spi2_read_write_byte(cmd_frame[i]);
-    }
-    spi2_cs_disable();
-    wk_delay_ms(10);  // 等待传感器响应
+	    // 发送命令帧前输出标记
+	    Serial_Printf("Sending command mode frame...\r\n");
+	    spi2_cs_enable();
+	    for(uint8_t i=0; i<8; i++) {
+	        spi2_read_write_byte(cmd_frame[i]);
+	    }
+	    spi2_cs_disable();
+	    Serial_Printf("Command frame sent, waiting for response...\r\n");  // 标记步骤
+	    wk_delay_ms(10);  // 短延时，避免卡死
 
-    // 读取响应帧
-    spi2_cs_enable();
-    for(uint8_t i = 0; i < 8; i++) {
-        response[i] = spi2_read_write_byte(0xFF);
-    }
-    spi2_cs_disable();
+	    // 读取响应前输出标记
+	    Serial_Printf("Reading command mode response...\r\n");
+	    spi2_cs_enable();
+	    for(uint8_t i=0; i<8; i++) {
+	        response[i] = spi2_read_write_byte(0xFF);
+	    }
+	    spi2_cs_disable();
 
-    // 验证响应是否有效
-    if(response[0] != LPBUS_HEADER) {
-        Serial_Printf("Command mode failed: invalid header (0x%02X)\r\n", response[0]);
-        return false;
-    }
+	    // 输出响应结果（无论是否有效）
+	    Serial_Printf("Command mode response: ");
+	    for(uint8_t i=0; i<8; i++) {
+	        Serial_Printf("0x%02X ", response[i]);
+	    }
+	    Serial_Printf("\r\n");
 
-    if(response[7] != calculate_crc(response, 7)) {
-        Serial_Printf("Command mode failed: CRC mismatch\r\n");
-        return false;
-    }
-
-    return true;
+	    // 验证响应
+	    if(response[0] != LPBUS_HEADER) {
+	        Serial_Printf("Command mode failed: invalid header\r\n");
+	        return false;
+	    }
+	    if(response[7] != calculate_crc(response, 7)) {
+	        Serial_Printf("Command mode failed: CRC mismatch\r\n");
+	        return false;
+	    }
+	    return true;
 }
 
 // 读取欧拉角数据
