@@ -97,9 +97,9 @@ int main(void)
 
   /* add user code begin 2 */
 
-//  be2_spi_init_cs_gpio();
+  be2_spi_init_cs_gpio();
 //
-//  wk_delay_ms(1000);
+  wk_delay_ms(1000);
 //
 //  Serial_Printf("=== LPMS-BE2 SPI LPBUS Test ===\r\n");
 //
@@ -119,6 +119,16 @@ int main(void)
 //  Serial_Printf("Step 2: Read WHO_AM_I (0x74)...\r\n");
 //  uint8_t who = be2_read_whoami_lpb();
 //  Serial_Printf("WHO_AM_I = 0x%02X %s\r\n", who, (who == 0x32) ? "✅ OK" : "❌ ERROR");
+  uint8_t who = be2_spi_read_reg(0x74);  // 使用修正后的读函数
+  Serial_Printf("Read 0x74 = 0x%02X\r\n", who);
+
+  // 只有WHO_AM_I正确（0x32），才进行后续初始化
+  if (who != 0x32) {
+	  Serial_Printf("❌ WHO_AM_I check failed\r\n");
+	  while(1);  // 通信异常，终止流程
+  }
+
+
   Serial_Printf("=== Init LPMS-BE2 ===\r\n");
   if (!be2_sensor_init()) {
 	  Serial_Printf("❌ xxx Init ERROR xxx\r\n");

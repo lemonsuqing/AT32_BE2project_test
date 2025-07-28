@@ -285,3 +285,25 @@ bool be2_sensor_init(void) {
     Serial_Printf("✅ 传感器初始化完成\r\n");
     return true;
 }
+
+// 读单个寄存器（参考硬件手册图3.1“SPI单个字节读取”时序）
+uint8_t be2_spi_read_reg(uint8_t addr) {
+    uint8_t tx_buf[2] = {0};
+    uint8_t rx_buf[2] = {0};
+
+    // 第一个字节：RW=1（读）+ 地址（addr的低7位）
+    tx_buf[0] = 0x80 | (addr & 0x7F);  // 0x80=10000000b（RW=1）
+    tx_buf[1] = 0x00;  // 第二个字节为dummy（用于接收数据）
+
+    LPMS_CS_LOW();
+    wk_delay_us(10);
+
+    // 发送2字节（16个时钟脉冲，符合硬件手册“单个字节读取需16个时钟”的要求）
+    rx_buf[0] = spi2_rw_byte(tx_buf[0]);  // 发送地址+RW位
+    rx_buf[1] = spi2_rw_byte(tx_buf[1]);  // 接收寄存器数据
+
+    wk_delay_us(10);
+    LPMS_CS_HIGH();
+
+    return rx_buf[1];  // 第二个字节为有效数据（硬件手册图3.1说明）
+}

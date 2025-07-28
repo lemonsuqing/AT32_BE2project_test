@@ -29,5 +29,6 @@ bool be2_enter_command_mode(void);                // ½øÈëÃüÁîÄ£Ê½£¨20220802ÓÃ»§Ê
 uint8_t be2_read_whoami_lpb(void);                // ¶ÁÈ¡WHO_AM_I¼Ä´æÆ÷£¨20230707Ó²¼şÊÖ²á6.1½Ú£©
 bool be2_read_sensor_data(BE2_SensorData *data);  // ¶ÁÈ¡´«¸ĞÆ÷Êı¾İ£¨20220802ÓÃ»§ÊÖ²á3.3½Ú£©
 bool be2_sensor_init(void);                       // ´«¸ĞÆ÷³õÊ¼»¯
+uint8_t be2_spi_read_reg(uint8_t addr);
 
 #endif
