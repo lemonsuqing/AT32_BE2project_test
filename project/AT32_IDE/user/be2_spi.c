@@ -48,17 +48,29 @@ static void spi_write_buf_debug(uint8_t *tx, uint8_t *rx, uint16_t len) {
 // 进入命令模式
 bool lpms_enter_command_mode(void) {
 	uint8_t cmd[] = { 0x3A, 0x01, 0x00, 0x06, 0xF1 };
-	uint8_t rx[sizeof(cmd)];
+	    uint8_t rx[32];
+	    uint8_t tx[32] = {0};
+	    uint8_t valid = 0;
 
-	spi_write_buf_debug(cmd, rx, sizeof(cmd));
-	print_buffer("[CMD Mode TX]", cmd, sizeof(cmd));
-	print_buffer("[CMD Mode RX]", rx, sizeof(cmd));
+	    // 发送进入命令模式命令
+	    spi_write_buf_debug(cmd, rx, sizeof(cmd));
+	    print_buffer("[CMD Mode TX]", cmd, sizeof(cmd));
+	    print_buffer("[CMD Mode RX]", rx, sizeof(cmd));
 
-	// 简单判断返回包是否有效（首尾字节匹配）
-	if (rx[0] == 0x3A && rx[sizeof(cmd) - 1] == 0xF1) {
-		return true;
-	}
-	return false;
+	    wk_delay_ms(5);
+
+	    // 连续读取多次数据，尝试获得有效响应
+	    for (int i = 0; i < 5; i++) {
+	        spi_write_buf_debug(tx, rx, 32);
+	        print_buffer("[CMD Mode Read RX]", rx, 32);
+	        if (rx[0] == 0x3A && rx[31] == 0xF1) {
+	            valid = 1;
+	            break;
+	        }
+	        wk_delay_ms(5);
+	    }
+
+	    return valid == 1;
 }
 
 // 设置输出为欧拉角
