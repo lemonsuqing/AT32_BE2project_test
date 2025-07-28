@@ -33,14 +33,39 @@ void be2_write_register(uint8_t reg, uint8_t value) {
 }
 
 // 读取寄存器（仅作兼容保留）
-uint8_t be2_read_register(uint8_t reg) {
-	Serial_Printf("Reading reg 0x%02X...\r\n", reg);  // 标记步骤
-    uint8_t value;
+uint8_t be2_read_register(uint8_t reg_addr)
+{
+    uint8_t tx_buf[10] = {
+        0x3A,       // Header
+        0x01,       // Read command
+        0x00,       // Reserved
+        0x06,       // Payload length
+        reg_addr,   // Register address (e.g., 0x74)
+        0x00, 0x00, 0x00, 0x00, 0x00 // Padding
+    };
+
+    uint8_t rx_buf[10] = {0};
+
     spi2_cs_enable();
-    spi2_read_write_byte((1 << 7) | reg);  // 读命令（最高位为1）
-    value = spi2_read_write_byte(0xFF);    // 读取数据
+    for (int i = 0; i < 10; i++)
+    {
+        rx_buf[i] = spi2_read_write_byte(tx_buf[i]);
+    }
     spi2_cs_disable();
-    return value;
+
+    wk_delay_ms(10); // 等待响应帧到来
+
+    // 读取响应帧：通常为 16 字节或以上
+    uint8_t resp[16] = {0};
+    spi2_cs_enable();
+    for (int i = 0; i < 16; i++)
+    {
+        resp[i] = spi2_read_write_byte(0xFF);
+    }
+    spi2_cs_disable();
+
+    // 响应数据在 resp[4] 之后
+    return resp[4];  // WHO_AM_I 应该在这里返回 0x62 等
 }
 
 // 进入命令模式
