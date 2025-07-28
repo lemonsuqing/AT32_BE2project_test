@@ -124,18 +124,18 @@ int main(void)
 	  float pitch = be2_read_float(BE2_REG_EULER_Y);
 	  float yaw = be2_read_float(BE2_REG_EULER_Z);
 
-	  Serial_Printf("Roll: %.2f, Pitch: %.2f, Yaw: %.2f\r\n", roll, pitch, yaw);
+	  Serial_Printf("Roll: %.2f, Pitch: %.2f, Yaw: %.2f\r\n\n", roll, pitch, yaw);
 
-	 be2_read_data(&sensor_data);
-
-	 // 打印欧拉角数据
-	 Serial_Printf("Roll: %.2f, Pitch: %.2f, Yaw: %.2f\r\n",
-			sensor_data.euler[0],
-			sensor_data.euler[1],
-			sensor_data.euler[2]);
+//	 be2_read_data(&sensor_data);
+//
+//	 // 打印欧拉角数据
+//	 Serial_Printf("Roll: %.2f, Pitch: %.2f, Yaw: %.2f\r\n",
+//			sensor_data.euler[0],
+//			sensor_data.euler[1],
+//			sensor_data.euler[2]);
 
 	 // 根据传感器输出频率延时 (100Hz)
-	 wk_delay_ms(10);
+	 wk_delay_ms(200);
     /* add user code end 3 */
   }
 }

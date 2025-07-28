@@ -48,18 +48,22 @@ void be2_spi_init(void) {
 
 // 读取单个寄存器
 uint8_t be2_read_register(uint8_t reg) {
-    uint8_t value;
+	uint8_t value;
 
-    spi2_cs_enable();
+	spi2_cs_enable();
 
-    // 发送读命令 (RW=1) 和寄存器地址
-    spi2_read_write_byte((1 << 7) | reg);
-    // 接收数据 (发送dummy字节)
-    value = spi2_read_write_byte(0xFF);
+	// 发送读命令 (RW=1) 和寄存器地址
+	uint8_t cmd = (1 << 7) | reg;
+	printf("SPI Read CMD: 0x%02X\r\n", cmd);
+	uint8_t received = spi2_read_write_byte(cmd);
 
-    spi2_cs_disable();
+	// 接收数据 (发送dummy字节)
+	value = spi2_read_write_byte(0xFF);
+	printf("SPI Read Reg 0x%02X, Value: 0x%02X\r\n", reg, value);
 
-    return value;
+	spi2_cs_disable();
+
+	return value;
 }
 
 // 写入单个寄存器
