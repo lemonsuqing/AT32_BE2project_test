@@ -1,347 +1,218 @@
 #include "be2_iic.h"
-#include "wk_i2c.h"
 #include "Serial.h"
-#include <string.h>
-#include <math.h>
 
-// I2C超时时间（ms）
-#define I2C_TIMEOUT_MS         100
+// 等待标志直到满足条件或超时，返回0成功，1超时
+static uint8_t wait_flag_timeout(i2c_type *i2c, uint32_t flag, flag_status status, uint32_t timeout_us) {
+    while(i2c_flag_get(i2c, flag) != status) {
+        if(timeout_us-- == 0) return 1;
+        wk_delay_us(1);
+    }
+    return 0;
+}
 
-/**
- * @brief  初始化BE2传感器I2C配置
- * @param  无
- * @retval 无
- */
+// I2C总线空闲等待
+static uint8_t wait_bus_idle(i2c_type *i2c) {
+    return wait_flag_timeout(i2c, I2C_BUSYF_FLAG, RESET, I2C_TIMEOUT_US);
+}
+
+// 初始化I2C（根据你的工程环境自己配置）
+// 这里只打印日志示例，用户需要自行初始化I2C2接口硬件
 void BE2_I2C_Init(void) {
-    Serial_Printf("BE2 I2C Mode (ADD0=0) Init\r\n");
+    Serial_Printf("BE2 I2C Init (using I2C2)\r\n");
+    // 你这里可以调用 i2c_init(...) 等初始化函数
 }
 
-/**
- * @brief  向BE2寄存器写入一个字节
- * @param  reg: 寄存器地址
- * @param  data: 要写入的数据
- * @retval 0:成功 1:失败
- */
-uint8_t BE2_I2C_WriteReg(uint8_t reg, uint8_t data) {
-    uint32_t timeout = I2C_TIMEOUT_MS * 1000;
-    uint8_t error = 0;
+// 写1个寄存器
+uint8_t BE2_I2C_WriteReg(uint8_t dev_addr, uint8_t reg_addr, uint8_t data) {
+    if(wait_bus_idle(BE2_I2C)) return 1;
 
-    // 等待总线空闲
-    while(i2c_flag_get(I2C2, I2C_BUSYF_FLAG) && timeout--) {
-        if(timeout == 0) {
-            Serial_Printf("I2C Bus Busy Timeout\r\n");
-            return 1;
-        }
-    }
+    i2c_start_generate(BE2_I2C);
+    if(wait_flag_timeout(BE2_I2C, I2C_TDIS_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
 
-    // 生成起始信号
-    i2c_start_generate(I2C2);
-    timeout = I2C_TIMEOUT_MS * 1000;
-    while(!i2c_flag_get(I2C2, I2C_TDIS_FLAG) && timeout--) {
-        if(timeout == 0) {
-            Serial_Printf("Start Condition Timeout\r\n");
-            i2c_stop_generate(I2C2); // 尝试恢复
-            return 1;
-        }
-    }
+    i2c_transfer_addr_set(BE2_I2C, dev_addr);
+    i2c_transfer_dir_set(BE2_I2C, I2C_DIR_TRANSMIT);
+    if(wait_flag_timeout(BE2_I2C, I2C_ADDRF_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
+    i2c_flag_clear(BE2_I2C, I2C_ADDRF_FLAG);
 
-    // 发送设备地址（写模式）
-    i2c_transfer_addr_set(I2C2, BE2_I2C_ADDR);
-    i2c_transfer_dir_set(I2C2, I2C_DIR_TRANSMIT);
+    i2c_data_send(BE2_I2C, reg_addr);
+    if(wait_flag_timeout(BE2_I2C, I2C_TDBE_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
 
-    // 等待地址发送完成
-    timeout = I2C_TIMEOUT_MS * 1000;
-    while(!i2c_flag_get(I2C2, I2C_ADDRF_FLAG) && timeout--) {
-        if(timeout == 0) {
-            Serial_Printf("Address Send Timeout\r\n");
-            i2c_stop_generate(I2C2);
-            return 1;
-        }
-    }
-    i2c_flag_clear(I2C2, I2C_ADDRF_FLAG); // 清除地址标志
+    i2c_data_send(BE2_I2C, data);
+    if(wait_flag_timeout(BE2_I2C, I2C_TDBE_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
 
-    // 发送寄存器地址
-    i2c_data_send(I2C2, reg);
-    timeout = I2C_TIMEOUT_MS * 1000;
-    while(!i2c_flag_get(I2C2, I2C_TDBE_FLAG) && timeout--) {
-        if(timeout == 0) {
-            Serial_Printf("Register Address Send Timeout\r\n");
-            i2c_stop_generate(I2C2);
-            return 1;
-        }
-    }
-
-    // 发送数据
-    i2c_data_send(I2C2, data);
-    timeout = I2C_TIMEOUT_MS * 1000;
-    while(!i2c_flag_get(I2C2, I2C_TDBE_FLAG) && timeout--) {
-        if(timeout == 0) {
-            Serial_Printf("Data Send Timeout\r\n");
-            i2c_stop_generate(I2C2);
-            return 1;
-        }
-    }
-
-    // 生成停止信号
-    i2c_stop_generate(I2C2);
-    timeout = I2C_TIMEOUT_MS * 1000;
-    while(!i2c_flag_get(I2C2, I2C_STOPF_FLAG) && timeout--) {
-        if(timeout == 0) {
-            Serial_Printf("Stop Condition Timeout\r\n");
-            return 1;
-        }
-    }
-    i2c_flag_clear(I2C2, I2C_STOPF_FLAG);
+    i2c_stop_generate(BE2_I2C);
+    if(wait_flag_timeout(BE2_I2C, I2C_STOPF_FLAG, SET, I2C_TIMEOUT_US)) return 1;
+    i2c_flag_clear(BE2_I2C, I2C_STOPF_FLAG);
 
     return 0;
+
+err_stop:
+    i2c_stop_generate(BE2_I2C);
+    return 1;
 }
 
-/**
- * @brief  从BE2寄存器读取一个字节
- * @param  reg: 寄存器地址
- * @param  data: 读取到的数据
- * @retval 0:成功 1:失败
- */
-uint8_t BE2_I2C_ReadReg(uint8_t reg, uint8_t *data) {
-    uint32_t timeout = I2C_TIMEOUT_MS * 1000;
+// 写多个寄存器
+uint8_t BE2_I2C_WriteRegs(uint8_t dev_addr, uint8_t reg_addr, uint8_t *buf, uint16_t len) {
+    if(wait_bus_idle(BE2_I2C)) return 1;
 
-    // 先写入要读取的寄存器地址
-    if(BE2_I2C_WriteReg(reg, 0xFF) != 0)
-        return 1;
+    i2c_start_generate(BE2_I2C);
+    if(wait_flag_timeout(BE2_I2C, I2C_TDIS_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
 
-    // 等待总线空闲
-    while(i2c_flag_get(I2C2, I2C_BUSYF_FLAG) && timeout--);
-    if(timeout == 0) return 1;
+    i2c_transfer_addr_set(BE2_I2C, dev_addr);
+    i2c_transfer_dir_set(BE2_I2C, I2C_DIR_TRANSMIT);
+    if(wait_flag_timeout(BE2_I2C, I2C_ADDRF_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
+    i2c_flag_clear(BE2_I2C, I2C_ADDRF_FLAG);
 
-    // 生成起始信号（读模式）
-    i2c_start_generate(I2C2);
-    timeout = I2C_TIMEOUT_MS * 1000;
-    while(!i2c_flag_get(I2C2, I2C_TDIS_FLAG) && timeout--);
-    if(timeout == 0) return 1;
+    i2c_data_send(BE2_I2C, reg_addr);
+    if(wait_flag_timeout(BE2_I2C, I2C_TDBE_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
 
-    // 设置从机地址和传输方向（读）
-    i2c_transfer_addr_set(I2C2, BE2_I2C_ADDR);  // 7位地址
-    i2c_transfer_dir_set(I2C2, I2C_DIR_RECEIVE);
-
-    // 禁用ACK（单字节读取）
-    i2c_ack_enable(I2C2, FALSE);
-
-    // 等待接收缓冲区非空
-    timeout = I2C_TIMEOUT_MS * 1000;
-    while(!i2c_flag_get(I2C2, I2C_RDBF_FLAG) && timeout--);
-    if(timeout == 0) return 1;
-    *data = i2c_data_receive(I2C2);
-
-    // 生成停止信号
-    i2c_stop_generate(I2C2);
-    timeout = I2C_TIMEOUT_MS * 1000;
-    while(!i2c_flag_get(I2C2, I2C_STOPF_FLAG) && timeout--);
-    if(timeout == 0) return 1;
-    i2c_flag_clear(I2C2, I2C_STOPF_FLAG);
-
-    // 恢复ACK使能
-    i2c_ack_enable(I2C2, TRUE);
-
-    return 0;
-}
-
-/**
- * @brief  从BE2连续读取多个寄存器
- * @param  reg: 起始寄存器地址
- * @param  buf: 接收缓冲区
- * @param  len: 要读取的长度
- * @retval 0:成功 1:失败
- */
-uint8_t BE2_I2C_ReadMultiReg(uint8_t reg, uint8_t *buf, uint16_t len) {
-    uint32_t timeout = I2C_TIMEOUT_MS * 1000;
-    uint16_t i;
-
-    // 先写入起始寄存器地址
-    if(BE2_I2C_WriteReg(reg, 0xFF) != 0)
-        return 1;
-
-    // 等待总线空闲
-    while(i2c_flag_get(I2C2, I2C_BUSYF_FLAG) && timeout--);
-    if(timeout == 0) return 1;
-
-    // 生成起始信号（读模式）
-    i2c_start_generate(I2C2);
-    timeout = I2C_TIMEOUT_MS * 1000;
-    while(!i2c_flag_get(I2C2, I2C_TDIS_FLAG) && timeout--);
-    if(timeout == 0) return 1;
-
-    // 设置从机地址和传输方向（读）
-    i2c_transfer_addr_set(I2C2, BE2_I2C_ADDR >> 1);
-    i2c_transfer_dir_set(I2C2, I2C_DIR_RECEIVE);
-
-    // 读取数据
-    for(i = 0; i < len; i++) {
-        // 最后一个字节前禁用ACK
-        if(i == len - 1)
-            i2c_ack_enable(I2C2, FALSE);
-
-        // 等待接收缓冲区非空
-        timeout = I2C_TIMEOUT_MS * 1000;
-        while(!i2c_flag_get(I2C2, I2C_RDBF_FLAG) && timeout--);
-        if(timeout == 0) return 1;
-        buf[i] = i2c_data_receive(I2C2);
+    for(uint16_t i = 0; i < len; i++) {
+        i2c_data_send(BE2_I2C, buf[i]);
+        if(wait_flag_timeout(BE2_I2C, I2C_TDBE_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
     }
 
-    // 生成停止信号
-    i2c_stop_generate(I2C2);
-    timeout = I2C_TIMEOUT_MS * 1000;
-    while(!i2c_flag_get(I2C2, I2C_STOPF_FLAG) && timeout--);
-    if(timeout == 0) return 1;
-    i2c_flag_clear(I2C2, I2C_STOPF_FLAG);
-
-    // 恢复ACK使能
-    i2c_ack_enable(I2C2, TRUE);
+    i2c_stop_generate(BE2_I2C);
+    if(wait_flag_timeout(BE2_I2C, I2C_STOPF_FLAG, SET, I2C_TIMEOUT_US)) return 1;
+    i2c_flag_clear(BE2_I2C, I2C_STOPF_FLAG);
 
     return 0;
+
+err_stop:
+    i2c_stop_generate(BE2_I2C);
+    return 1;
 }
 
-/**
- * @brief  初始化BE2传感器
- * @param  无
- * @retval 0:成功 1:失败
- */
-uint8_t BE2_Init(void) {
-    uint8_t whoami;
-    uint8_t ret;
-    Serial_Printf("Resetting sensor...\r\n");
-    // 发送复位命令
-	ret = BE2_I2C_WriteReg(REG_SYS_CONFIG, 0x80);
-	wk_delay_ms(100); // 等待复位完成
+// 读1个寄存器
+uint8_t BE2_I2C_ReadReg(uint8_t dev_addr, uint8_t reg_addr, uint8_t *data) {
+    if(wait_bus_idle(BE2_I2C)) return 1;
 
-	// 读取设备ID（WHO_AM_I默认0x32）
-    ret = BE2_I2C_ReadReg(REG_WHO_AM_I, &whoami);
-    Serial_Printf("WHO_AM_I read: 0x%02X, ret=%d\r\n", whoami, ret);
-    if(ret != 0 || whoami != 0x32) {
-		Serial_Printf("BE2 Init Failed! WHO_AM_I=0x%02X, error=%d\r\n", whoami, ret);
+    // 先写寄存器地址
+    i2c_start_generate(BE2_I2C);
+    if(wait_flag_timeout(BE2_I2C, I2C_TDIS_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
 
-		// 尝试读取其他寄存器验证通信
-		uint8_t status;
-		if(BE2_I2C_ReadReg(REG_STATUS, &status) == 0) {
-			Serial_Printf("Status register: 0x%02X\r\n", status);
-		} else {
-			Serial_Printf("Failed to read status register\r\n");
-		}
-		return 1;
-	}
+    i2c_transfer_addr_set(BE2_I2C, dev_addr);
+    i2c_transfer_dir_set(BE2_I2C, I2C_DIR_TRANSMIT);
+    if(wait_flag_timeout(BE2_I2C, I2C_ADDRF_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
+    i2c_flag_clear(BE2_I2C, I2C_ADDRF_FLAG);
 
-    // 使能寄存器修改（FUN_CONFIG Bit7=1）
-    ret |= BE2_I2C_WriteReg(REG_FUN_CONFIG, 0x80);
+    i2c_data_send(BE2_I2C, reg_addr);
+    if(wait_flag_timeout(BE2_I2C, I2C_TDBE_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
 
-    // 配置数据输出使能
-    ret |= BE2_I2C_WriteReg(REG_DATA_ENABLE, 0x37);  // 使能加速度、陀螺仪等
+    // 重启信号准备读
+    i2c_start_generate(BE2_I2C);
+    if(wait_flag_timeout(BE2_I2C, I2C_TDIS_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
 
-    // 配置输出频率为100Hz
-    ret |= BE2_I2C_WriteReg(REG_DATA_CTRL, 0x03);
+    i2c_transfer_addr_set(BE2_I2C, dev_addr);
+    i2c_transfer_dir_set(BE2_I2C, I2C_DIR_RECEIVE);
 
-    if(ret == 0)
-        Serial_Printf("BE2 Init Success (I2C ADD0=0)\r\n");
-    else
-        Serial_Printf("BE2 Config Error\r\n");
+    // 禁止ACK，因为只读一个字节
+    i2c_ack_enable(BE2_I2C, FALSE);
 
-    return ret;
+    if(wait_flag_timeout(BE2_I2C, I2C_ADDRF_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
+    i2c_flag_clear(BE2_I2C, I2C_ADDRF_FLAG);
+
+    // 等待接收缓冲区满
+    if(wait_flag_timeout(BE2_I2C, I2C_RDBF_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
+
+    *data = i2c_data_receive(BE2_I2C);
+
+    i2c_stop_generate(BE2_I2C);
+    if(wait_flag_timeout(BE2_I2C, I2C_STOPF_FLAG, SET, I2C_TIMEOUT_US)) return 1;
+    i2c_flag_clear(BE2_I2C, I2C_STOPF_FLAG);
+
+    i2c_ack_enable(BE2_I2C, TRUE);
+
+    return 0;
+
+err_stop:
+    i2c_stop_generate(BE2_I2C);
+    i2c_ack_enable(BE2_I2C, TRUE);
+    return 1;
 }
 
-/**
- * @brief  字节转浮点数（小端格式）
- * @param  bytes: 4字节数组
- * @retval 转换后的浮点数
- */
-float BytesToFloat(uint8_t *bytes) {
-    union {
-        uint8_t b[4];
-        float f;
-    } data;
-    data.b[0] = bytes[0];
-    data.b[1] = bytes[1];
-    data.b[2] = bytes[2];
-    data.b[3] = bytes[3];
-    return data.f;
+// 读多个寄存器
+uint8_t BE2_I2C_ReadRegs(uint8_t dev_addr, uint8_t reg_addr, uint8_t *buf, uint16_t len) {
+    if(wait_bus_idle(BE2_I2C)) return 1;
+
+    // 先写寄存器地址
+    i2c_start_generate(BE2_I2C);
+    if(wait_flag_timeout(BE2_I2C, I2C_TDIS_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
+
+    i2c_transfer_addr_set(BE2_I2C, dev_addr);
+    i2c_transfer_dir_set(BE2_I2C, I2C_DIR_TRANSMIT);
+    if(wait_flag_timeout(BE2_I2C, I2C_ADDRF_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
+    i2c_flag_clear(BE2_I2C, I2C_ADDRF_FLAG);
+
+    i2c_data_send(BE2_I2C, reg_addr);
+    if(wait_flag_timeout(BE2_I2C, I2C_TDBE_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
+
+    // 重启准备读数据
+    i2c_start_generate(BE2_I2C);
+    if(wait_flag_timeout(BE2_I2C, I2C_TDIS_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
+
+    i2c_transfer_addr_set(BE2_I2C, dev_addr);
+    i2c_transfer_dir_set(BE2_I2C, I2C_DIR_RECEIVE);
+
+    if(wait_flag_timeout(BE2_I2C, I2C_ADDRF_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
+    i2c_flag_clear(BE2_I2C, I2C_ADDRF_FLAG);
+
+    for(uint16_t i = 0; i < len; i++) {
+        // 最后一个字节禁用ACK
+        if(i == len - 1) i2c_ack_enable(BE2_I2C, FALSE);
+        else i2c_ack_enable(BE2_I2C, TRUE);
+
+        if(wait_flag_timeout(BE2_I2C, I2C_RDBF_FLAG, SET, I2C_TIMEOUT_US)) goto err_stop;
+
+        buf[i] = i2c_data_receive(BE2_I2C);
+    }
+
+    i2c_stop_generate(BE2_I2C);
+    if(wait_flag_timeout(BE2_I2C, I2C_STOPF_FLAG, SET, I2C_TIMEOUT_US)) return 1;
+    i2c_flag_clear(BE2_I2C, I2C_STOPF_FLAG);
+
+    i2c_ack_enable(BE2_I2C, TRUE);
+
+    return 0;
+
+err_stop:
+    i2c_stop_generate(BE2_I2C);
+    i2c_ack_enable(BE2_I2C, TRUE);
+    return 1;
 }
 
-/**
- * @brief  读取BE2所有传感器数据
- * @param  data: 存储数据的结构体指针
- * @retval 0:成功 1:失败
- */
-uint8_t BE2_ReadAllData(BE2_Data *data) {
-    uint8_t buf[4];
-    uint8_t ret = 0;
+void I2C_Scan(i2c_type *i2c) {
+    uint8_t addr;
+    uint32_t timeout;
 
-    // 读取时间戳
-    ret |= BE2_I2C_ReadMultiReg(REG_TIMESTAMP_0, buf, 4);
-    data->timestamp = (buf[3] << 24) | (buf[2] << 16) | (buf[1] << 8) | buf[0];
+    Serial_Printf("Start I2C Bus Scan...\r\n");
+    for(addr = 3; addr < 0x78; addr++) {
+        timeout = 100000;
 
-    // 读取加速度
-    ret |= BE2_I2C_ReadMultiReg(REG_ACC_X_0, buf, 4);
-    data->acc_x = BytesToFloat(buf);
-    ret |= BE2_I2C_ReadMultiReg(REG_ACC_Y_0, buf, 4);
-    data->acc_y = BytesToFloat(buf);
-    ret |= BE2_I2C_ReadMultiReg(REG_ACC_Z_0, buf, 4);
-    data->acc_z = BytesToFloat(buf);
+        // 生成起始信号
+        i2c_start_generate(i2c);
 
-    // 读取陀螺仪
-    ret |= BE2_I2C_ReadMultiReg(REG_GYR_X_0, buf, 4);
-    data->gyr_x = BytesToFloat(buf);
-    ret |= BE2_I2C_ReadMultiReg(REG_GYR_Y_0, buf, 4);
-    data->gyr_y = BytesToFloat(buf);
-    ret |= BE2_I2C_ReadMultiReg(REG_GYR_Z_0, buf, 4);
-    data->gyr_z = BytesToFloat(buf);
+        // 设置设备地址（写模式）
+        i2c_transfer_addr_set(i2c, addr << 1);
+        i2c_transfer_dir_set(i2c, I2C_DIR_TRANSMIT);
 
-    // 读取四元数
-    ret |= BE2_I2C_ReadMultiReg(REG_QUAT_W_0, buf, 4);
-    data->quat_w = BytesToFloat(buf);
-    ret |= BE2_I2C_ReadMultiReg(REG_QUAT_X_0, buf, 4);
-    data->quat_x = BytesToFloat(buf);
-    ret |= BE2_I2C_ReadMultiReg(REG_QUAT_Y_0, buf, 4);
-    data->quat_y = BytesToFloat(buf);
-    ret |= BE2_I2C_ReadMultiReg(REG_QUAT_Z_0, buf, 4);
-    data->quat_z = BytesToFloat(buf);
+        // 等待地址应答标志
+        while(!i2c_flag_get(i2c, I2C_ADDRF_FLAG) && timeout--) {
+            if(i2c_flag_get(i2c, I2C_ACKFAIL_FLAG))
+                break;
+        }
 
-    // 读取欧拉角
-    ret |= BE2_I2C_ReadMultiReg(REG_EULER_X_0, buf, 4);
-    data->euler_roll = BytesToFloat(buf);
-    ret |= BE2_I2C_ReadMultiReg(REG_EULER_Y_0, buf, 4);
-    data->euler_pitch = BytesToFloat(buf);
-    ret |= BE2_I2C_ReadMultiReg(REG_EULER_Z_0, buf, 4);
-    data->euler_yaw = BytesToFloat(buf);
+        if(timeout && !i2c_flag_get(i2c, I2C_ACKFAIL_FLAG)) {
+            Serial_Printf("Device found at 0x%02X\r\n", addr);
+        }
 
-    // 读取线性加速度
-    ret |= BE2_I2C_ReadMultiReg(REG_LIN_ACC_X_0, buf, 4);
-    data->lin_acc_x = BytesToFloat(buf);
-    ret |= BE2_I2C_ReadMultiReg(REG_LIN_ACC_Y_0, buf, 4);
-    data->lin_acc_y = BytesToFloat(buf);
-    ret |= BE2_I2C_ReadMultiReg(REG_LIN_ACC_Z_0, buf, 4);
-    data->lin_acc_z = BytesToFloat(buf);
+        // 产生停止信号，清除标志位
+        i2c_stop_generate(i2c);
+        i2c_flag_clear(i2c, I2C_ADDRF_FLAG | I2C_ACKFAIL_FLAG);
 
-    // 读取温度
-    ret |= BE2_I2C_ReadMultiReg(REG_TEMP_0, buf, 4);
-    data->temp = BytesToFloat(buf);
-
-    return ret;
+        // 延时，防止总线冲突
+        wk_delay_ms(1);
+    }
+    Serial_Printf("I2C Bus Scan Finished.\r\n");
 }
 
-/**
- * @brief  打印传感器数据到串口
- * @param  data: 要打印的数据
- * @retval 无
- */
-void BE2_PrintData(BE2_Data *data) {
-    Serial_Printf("Timestamp: %u\r\n", data->timestamp);
-    Serial_Printf("Acc: %.3f, %.3f, %.3f g\r\n",
-                 data->acc_x, data->acc_y, data->acc_z);
-    Serial_Printf("Gyr: %.3f, %.3f, %.3f dps\r\n",
-                 data->gyr_x, data->gyr_y, data->gyr_z);
-    Serial_Printf("Euler: Roll=%.2f, Pitch=%.2f, Yaw=%.2f °\r\n",
-                 data->euler_roll, data->euler_pitch, data->euler_yaw);
-    Serial_Printf("Quat: %.4f, %.4f, %.4f, %.4f\r\n",
-                 data->quat_w, data->quat_x, data->quat_y, data->quat_z);
-    Serial_Printf("LinAcc: %.3f, %.3f, %.3f g\r\n",
-                 data->lin_acc_x, data->lin_acc_y, data->lin_acc_z);
-    Serial_Printf("Temp: %.2f °C\r\n", data->temp);
-    Serial_Printf("----------------------------------------\r\n");
-}
+

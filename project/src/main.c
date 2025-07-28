@@ -66,7 +66,7 @@
 
 /* private user code ---------------------------------------------------------*/
 /* add user code begin 0 */
-BE2_Data sensor_data;
+//BE2_Data sensor_data;
 /* add user code end 0 */
 
 /**
@@ -110,22 +110,7 @@ int main(void)
   BE2_I2C_Init();    // 初始化BE2的I2C通信
   wk_delay_ms(100);  // 等待传感器上电稳定
 
-  for (uint8_t addr = 3; addr < 0x78; addr++)
-  {
-      i2c_transfer_addr_set(I2C2, addr);
-      i2c_transfer_dir_set(I2C2, I2C_DIR_TRANSMIT);
-      i2c_start_generate(I2C2);
 
-      uint32_t timeout = 10000;
-      while(i2c_flag_get(I2C2, I2C_ADDRF_FLAG) == RESET && timeout--) {}
-
-      if(timeout && !i2c_flag_get(I2C2, I2C_ACKFAIL_FLAG))
-      {
-          printf("Found device at address 0x%02X\r\n", addr);
-      }
-      i2c_stop_generate(I2C2);
-      i2c_flag_clear(I2C2, I2C_ADDRF_FLAG | I2C_ACKFAIL_FLAG);
-  }
 //  if(BE2_Init() != 0)
 //  {
 //	Serial_Printf("Sensor init failed!\r\n");
