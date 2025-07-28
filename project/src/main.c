@@ -35,7 +35,8 @@
 /* private includes ----------------------------------------------------------*/
 /* add user code begin private includes */
 #include "Serial.h"
-#include "be2_spi.h"
+//#include "be2_spi.h"
+#include "be2_iic.h"
 /* add user code end private includes */
 
 /* private typedef -----------------------------------------------------------*/
@@ -106,48 +107,28 @@ int main(void)
   /* add user code begin 2 */
   wk_delay_ms(100);
 
-//  Serial_Printf("SPI write test...\r\n");
-//  spi2_cs_enable();
-//  uint8_t ret = spi2_read_write_byte(0x03);
-//  spi2_cs_disable();
-//  Serial_Printf("Test SPI returned: 0x%02X\r\n", ret);
-//
-//  Serial_Printf("Reading WHO_AM_I...\r\n");
-//  uint8_t who = 0;
-//  if (be2_read_register(0x74, &who)) {
-//      Serial_Printf("WHO_AM_I = 0x%02X\r\n", who);
-//  } else {
-//      Serial_Printf("Failed to read WHO_AM_I\r\n");
-//  }
-
-    // 初始化传感器（使用LP-BUS协议）
-//    be2_spi_init();
-//
-//    Serial_Printf("LPMS-BE2 initialization complete.\r\n");
+  BE2_I2C_Init();    // 初始化BE2的I2C通信
+  wk_delay_ms(100);  // 等待传感器上电稳定
+  if(BE2_Init() != 0)
+  {
+	Serial_Printf("Sensor init failed!\r\n");
+	while(1);  // 初始化失败时阻塞
+  }
 
   /* add user code end 2 */
 
   while(1)
   {
     /* add user code begin 3 */
-//	  be2_read_data(&sensor_data); // 改用LP-BUS命令读取
-//
-//	  // 打印欧拉角数据
-//	  Serial_Printf("Roll: %.2f, Pitch: %.2f, Yaw: %.2f\r\n",
-//					sensor_data.euler[0],
-//					sensor_data.euler[1],
-//					sensor_data.euler[2]);
-
-//	 be2_read_data(&sensor_data);
-//
-//	 // 打印欧拉角数据
-//	 Serial_Printf("Roll: %.2f, Pitch: %.2f, Yaw: %.2f\r\n",
-//			sensor_data.euler[0],
-//			sensor_data.euler[1],
-//			sensor_data.euler[2]);
-
-	 // 根据传感器输出频率延时 (100Hz)
-	 wk_delay_ms(200);
+  if(BE2_ReadAllData(&sensor_data) == 0)  // 读取传感器数据
+  {
+	BE2_PrintData(&sensor_data);  // 通过串口打印数据
+  }
+  else
+  {
+	Serial_Printf("Data read failed!\r\n");
+  }
+  wk_delay_ms(200);  // 控制读取频率（与手册中默认100Hz输出兼容）
     /* add user code end 3 */
   }
 }
