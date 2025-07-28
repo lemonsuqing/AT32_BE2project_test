@@ -63,7 +63,7 @@
 
 /* private user code ---------------------------------------------------------*/
 /* add user code begin 0 */
-
+BE2_Data sensor_data;
 /* add user code end 0 */
 
 /**
@@ -96,44 +96,26 @@ int main(void)
   wk_spi2_init();
 
   /* add user code begin 2 */
+  be2_spi_init();
 
-  lpms_be2_init(); // 初始化CS引脚
+  printf("LPMS-BE2 SPI Interface Initialized\r\n");
 
-  Serial_Printf("=== LPMS-BE2 SPI DEMO START ===\r\n");
-  wk_delay_ms(1000); // 等待传感器上电稳定
-
-  if (!lpms_enter_command_mode()) {
-	  Serial_Printf("❌ 进入命令模式失败\r\n");
-	  while (1);
-  }
-
-  lpms_set_output_format_euler(); // 设置输出欧拉角
-  lpms_set_output_frequency(50);  // 设置输出频率为 50Hz
-  lpms_start_streaming();         // 开始数据流
-  lpms_data_t data;
 
   /* add user code end 2 */
 
   while(1)
   {
     /* add user code begin 3 */
-	  if (lpms_read_euler_angles(&data)) {
-		  Serial_Printf("Euler: Roll=%.2f Pitch=%.2f Yaw=%.2f\r\n",
-						data.roll, data.pitch, data.yaw);
-	  }
-	  wk_delay_ms(20); // 保持和频率同步（50Hz ≈ 20ms）
-//	  if (whoami == 0x32) {  // 仅在通讯正常时读取
-//	        be2_read_sensors();
-//	      }
-//	      wk_delay_ms(100);  // 10Hz读取频率
-//	  LPMS_CS_LOW();
-//	  for (int i = 0; i < 10; i++) {
-//	      spi2_rw_byte(0x5A + i); // 发送递增数据便于区分
-//	  }
-//	  LPMS_CS_HIGH();
-//
-//	  Serial_Printf("SPI Send=0xA5\r\n");
-//	  wk_delay_ms(500);  // 等一会，重复发送
+	 be2_read_data(&sensor_data);
+
+	 // 打印欧拉角数据
+	 printf("Roll: %.2f, Pitch: %.2f, Yaw: %.2f\r\n",
+			sensor_data.euler[0],
+			sensor_data.euler[1],
+			sensor_data.euler[2]);
+
+	 // 根据传感器输出频率延时 (100Hz)
+	 wk_delay_ms(10);
     /* add user code end 3 */
   }
 }

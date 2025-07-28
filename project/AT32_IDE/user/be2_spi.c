@@ -5,139 +5,115 @@
 #include <string.h>
 #include <math.h>
 
-#define LPMS_CS_LOW()   gpio_bits_reset(GPIOC, GPIO_PINS_3)
-#define LPMS_CS_HIGH()  gpio_bits_set(GPIOC, GPIO_PINS_3)
+// 初始化传感器
+void be2_spi_init(void) {
+    // 重置传感器
+    be2_write_register(BE2_REG_SYS_CONFIG, 0x80);
+    wk_delay_ms(100);
 
-static void spi_write_buf(uint8_t *tx, uint8_t *rx, uint16_t len) {
-    LPMS_CS_LOW();
-    wk_delay_ms(20);
-    for (uint16_t i = 0; i < len; i++) {
-        rx[i] = spi2_rw_byte(tx[i]);
-    }
-    wk_delay_ms(20);
-    LPMS_CS_HIGH();
-}
-
-static void print_buffer(const char *prefix, uint8_t *buf, uint16_t len) {
-    Serial_Printf("%s:", prefix);
-    for (uint16_t i = 0; i < len; i++) {
-        Serial_Printf(" %02X", buf[i]);
-    }
-    Serial_Printf("\r\n");
-}
-
-// SPI发送接收一个缓冲区数据（不加延时）
-static void spi_write_buf_debug(uint8_t *tx, uint8_t *rx, uint16_t len) {
-    LPMS_CS_LOW();
-    for (uint16_t i = 0; i < len; i++) {
-        rx[i] = spi2_rw_byte(tx[i]);
-    }
-    LPMS_CS_HIGH();
-}
-
-//static void spi_write_buf(uint8_t *tx, uint8_t *rx, uint16_t len) {
-//    LPMS_CS_LOW();
-//    // wk_delay_ms(20); // 建议去掉延时
-//    for (uint16_t i = 0; i < len; i++) {
-//        rx[i] = spi2_rw_byte(tx[i]);
-//    }
-//    // wk_delay_ms(20); // 建议去掉延时
-//    LPMS_CS_HIGH();
-//}
-
-// 进入命令模式
-bool lpms_enter_command_mode(void) {
-	uint8_t cmd[] = { 0x3A, 0x01, 0x00, 0x06, 0xF1 };
-	    uint8_t rx[32];
-	    uint8_t tx[32] = {0};
-	    uint8_t valid = 0;
-
-	    spi_write_buf_debug(cmd, rx, sizeof(cmd));
-	    print_buffer("[CMD Mode TX]", cmd, sizeof(cmd));
-	    print_buffer("[CMD Mode RX]", rx, sizeof(cmd));
-
-	    wk_delay_ms(50); // 增加延时
-
-	    for (int i = 0; i < 10; i++) { // 多次读，扩大尝试次数
-	        spi_write_buf_debug(tx, rx, 32);
-	        print_buffer("[CMD Mode Read RX]", rx, 32);
-
-	        if (rx[0] == 0x3A && rx[31] == 0xF1) {
-	            valid = 1;
-	            break;
-	        }
-
-	        wk_delay_ms(10);
-	    }
-
-	    return valid == 1;
-}
-
-// 设置输出为欧拉角
-void lpms_set_output_format_euler(void) {
-    uint8_t cmd[] = {
-        0x3A, 0x02, 0x03, // header, command, payload_len
-        0x00, 0x03, 0x01, // payload: set output euler
-        0xF1
-    };
-    uint8_t rx[sizeof(cmd)];
-    spi_write_buf(cmd, rx, sizeof(cmd));
-}
-
-// 设置输出频率
-void lpms_set_output_frequency(uint8_t hz) {
-    uint8_t cmd[] = {
-        0x3A, 0x03, 0x02,
-        0x01, hz,
-        0xF1
-    };
-    uint8_t rx[sizeof(cmd)];
-    spi_write_buf(cmd, rx, sizeof(cmd));
-}
-
-// 启动数据输出
-void lpms_start_streaming(void) {
-    uint8_t cmd[] = {
-        0x3A, 0x04, 0x01,
-        0x01, // start streaming
-        0xF1
-    };
-    uint8_t rx[sizeof(cmd)];
-    spi_write_buf(cmd, rx, sizeof(cmd));
-}
-
-// 读取欧拉角数据（从传感器自动发回的数据包中解析）
-bool lpms_read_euler_angles(lpms_data_t *data) {
-    uint8_t tx[32] = {0};
-    uint8_t rx[32];
-
-    spi_write_buf_debug(tx, rx, 32);
-    print_buffer("[Read Euler TX]", tx, 32);
-    print_buffer("[Read Euler RX]", rx, 32);
-
-    if (rx[0] != 0x3A || rx[31] != 0xF1) {
-        Serial_Printf("Invalid data packet header or footer\r\n");
-        return false;
+    // 验证设备ID (应为0x32)
+    if(be2_read_register(BE2_REG_WHO_AM_I) != 0x32) {
+        // 设备ID错误
+        while(1);
     }
 
-    // 解析roll, pitch, yaw，假设为float格式
-    memcpy(&data->roll,  &rx[7],  4);
-    memcpy(&data->pitch, &rx[11], 4);
-    memcpy(&data->yaw,   &rx[15], 4);
+    // 配置数据输出 (使能时间戳、加速度、陀螺仪、四元数、欧拉角)
+    be2_write_register(BE2_REG_DATA_ENABLE, 0x7F); // 0b01111111
 
-    return true;
+    // 设置加速度范围 ±4g (默认)
+    be2_write_register(BE2_REG_CTRL_0_A, 0x04);
+
+    // 设置陀螺仪范围 ±2000dps (默认)
+    be2_write_register(BE2_REG_CTRL_1_G, 0x10);
+
+    // 设置输出频率 100Hz
+    be2_write_register(BE2_REG_DATA_CTRL, 0x03);
+
+    // 设置卡尔曼滤波 (默认)
+    be2_write_register(BE2_REG_FILTER_CONFIG, 0x01);
+
+    // 启动传感器
+    be2_write_register(BE2_REG_SYS_CONFIG, 0x00);
 }
 
-void lpms_be2_init(void) {
-    // 初始化CS引脚
-    gpio_init_type gpio_init_struct;
-//    crm_periph_clock_enable(CRM_GPIOC, TRUE);
-    gpio_default_para_init(&gpio_init_struct);
-    gpio_init_struct.gpio_pins = GPIO_PINS_3;
-    gpio_init_struct.gpio_mode = GPIO_MODE_OUTPUT;
-    gpio_init_struct.gpio_out_type = GPIO_OUTPUT_PUSH_PULL;
-    gpio_init_struct.gpio_drive_strength = GPIO_DRIVE_STRENGTH_STRONGER;
-    gpio_init(GPIOC, &gpio_init_struct);
+// 读取单个寄存器
+uint8_t be2_read_register(uint8_t reg) {
+    uint8_t value;
 
-    LPMS_CS_HIGH();
+    spi2_cs_enable();
+
+    // 发送读命令 (RW=1) 和寄存器地址
+    spi2_read_write_byte((1 << 7) | reg);
+    // 接收数据 (发送dummy字节)
+    value = spi2_read_write_byte(0xFF);
+
+    spi2_cs_disable();
+
+    return value;
+}
+
+// 写入单个寄存器
+void be2_write_register(uint8_t reg, uint8_t value) {
+    spi2_cs_enable();
+
+    // 发送写命令 (RW=0) 和寄存器地址
+    spi2_read_write_byte(reg & 0x7F); // RW=0
+    // 发送数据
+    spi2_read_write_byte(value);
+
+    spi2_cs_disable();
+}
+
+// 读取32位数据
+uint32_t be2_read_32bit(uint8_t reg) {
+    uint32_t value = 0;
+
+    spi2_cs_enable();
+
+    // 发送读命令和起始地址
+    spi2_read_write_byte((1 << 7) | reg);
+
+    // 读取4个字节 (小端格式)
+    value |= spi2_read_write_byte(0xFF);
+    value |= spi2_read_write_byte(0xFF) << 8;
+    value |= spi2_read_write_byte(0xFF) << 16;
+    value |= spi2_read_write_byte(0xFF) << 24;
+
+    spi2_cs_disable();
+
+    return value;
+}
+
+// 读取浮点数
+float be2_read_float(uint8_t reg) {
+    uint32_t raw = be2_read_32bit(reg);
+    return *((float*)&raw);
+}
+
+// 读取完整传感器数据
+void be2_read_data(BE2_Data *data) {
+    // 时间戳 (单位: 0.002秒)
+    uint32_t timestamp_raw = be2_read_32bit(BE2_REG_TIMESTAMP);
+    data->timestamp = timestamp_raw * 0.002f;
+
+    // 加速度
+    data->acc[0] = be2_read_float(BE2_REG_ACC_X);
+    data->acc[1] = be2_read_float(BE2_REG_ACC_Y);
+    data->acc[2] = be2_read_float(BE2_REG_ACC_Z);
+
+    // 陀螺仪
+    data->gyro[0] = be2_read_float(BE2_REG_GYR_X);
+    data->gyro[1] = be2_read_float(BE2_REG_GYR_Y);
+    data->gyro[2] = be2_read_float(BE2_REG_GYR_Z);
+
+    // 四元数
+    data->quaternion[0] = be2_read_float(BE2_REG_QUAT_W); // w
+    data->quaternion[1] = be2_read_float(BE2_REG_QUAT_X); // x
+    data->quaternion[2] = be2_read_float(BE2_REG_QUAT_Y); // y
+    data->quaternion[3] = be2_read_float(BE2_REG_QUAT_Z); // z
+
+    // 欧拉角
+    data->euler[0] = be2_read_float(BE2_REG_EULER_X); // roll
+    data->euler[1] = be2_read_float(BE2_REG_EULER_Y); // pitch
+    data->euler[2] = be2_read_float(BE2_REG_EULER_Z); // yaw
 }

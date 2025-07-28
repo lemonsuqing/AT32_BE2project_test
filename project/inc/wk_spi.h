@@ -44,7 +44,9 @@ float lpms_spi_read_float(uint8_t start_addr);
 
 /* exported types -------------------------------------------------------------*/
 /* add user code begin exported types */
-uint8_t spi2_rw_byte(uint8_t byte);
+uint8_t spi2_read_write_byte(uint8_t byte);
+void spi2_cs_enable(void);
+void spi2_cs_disable(void);
 /* add user code end exported types */
 
 /* exported constants --------------------------------------------------------*/

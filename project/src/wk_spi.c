@@ -84,14 +84,21 @@ void wk_spi2_init(void)
   spi_init_struct.master_slave_mode = SPI_MODE_MASTER;
   spi_init_struct.frame_bit_num = SPI_FRAME_8BIT;
   spi_init_struct.first_bit_transmission = SPI_FIRST_BIT_MSB;
-  spi_init_struct.mclk_freq_division = SPI_MCLK_DIV_256;
+  spi_init_struct.mclk_freq_division = SPI_MCLK_DIV_8;
   spi_init_struct.clock_polarity = SPI_CLOCK_POLARITY_LOW;
   spi_init_struct.clock_phase = SPI_CLOCK_PHASE_1EDGE;
   spi_init_struct.cs_mode_selection = SPI_CS_SOFTWARE_MODE;
   spi_init(SPI2, &spi_init_struct);
 
   /* add user code begin spi2_init 2 */
-
+  // 添加片选引脚(PC3)初始化
+  gpio_init_struct.gpio_pins = GPIO_PINS_3;
+  gpio_init_struct.gpio_mode = GPIO_MODE_OUTPUT;
+  gpio_init_struct.gpio_out_type = GPIO_OUTPUT_PUSH_PULL;
+  gpio_init_struct.gpio_pull = GPIO_PULL_UP;
+  gpio_init_struct.gpio_drive_strength = GPIO_DRIVE_STRENGTH_MODERATE;
+  gpio_init(GPIOC, &gpio_init_struct);
+  gpio_bits_set(GPIOC, GPIO_PINS_3); // 初始状态不选中
   /* add user code end spi2_init 2 */
 
   spi_enable(SPI2, TRUE);
@@ -102,7 +109,15 @@ void wk_spi2_init(void)
 }
 
 /* add user code begin 1 */
-uint8_t spi2_rw_byte(uint8_t byte) {
+void spi2_cs_enable(void) {
+    gpio_bits_reset(GPIOC, GPIO_PINS_3);
+}
+
+void spi2_cs_disable(void) {
+    gpio_bits_set(GPIOC, GPIO_PINS_3);
+}
+
+uint8_t spi2_read_write_byte(uint8_t byte) {
     // 等待发送缓冲区为空
     while (spi_i2s_flag_get(SPI2, SPI_I2S_TDBE_FLAG) == RESET);
     // 发送数据
