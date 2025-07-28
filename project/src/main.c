@@ -98,23 +98,29 @@ int main(void)
   /* add user code begin 2 */
   wk_delay_ms(100);
 
-    // 初始化传感器（使用LP-BUS协议）
-    be2_spi_init();
+  Serial_Printf("SPI write test...\r\n");
+  spi2_cs_enable();
+  uint8_t ret = spi2_read_write_byte(0xAA);
+  spi2_cs_disable();
+  Serial_Printf("Test SPI returned: 0x%02X\r\n", ret);
 
-    Serial_Printf("LPMS-BE2 initialization complete.\r\n");
+    // 初始化传感器（使用LP-BUS协议）
+//    be2_spi_init();
+//
+//    Serial_Printf("LPMS-BE2 initialization complete.\r\n");
 
   /* add user code end 2 */
 
   while(1)
   {
     /* add user code begin 3 */
-	  be2_read_data(&sensor_data); // 改用LP-BUS命令读取
-
-	  // 打印欧拉角数据
-	  Serial_Printf("Roll: %.2f, Pitch: %.2f, Yaw: %.2f\r\n",
-					sensor_data.euler[0],
-					sensor_data.euler[1],
-					sensor_data.euler[2]);
+//	  be2_read_data(&sensor_data); // 改用LP-BUS命令读取
+//
+//	  // 打印欧拉角数据
+//	  Serial_Printf("Roll: %.2f, Pitch: %.2f, Yaw: %.2f\r\n",
+//					sensor_data.euler[0],
+//					sensor_data.euler[1],
+//					sensor_data.euler[2]);
 
 //	 be2_read_data(&sensor_data);
 //
