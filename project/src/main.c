@@ -101,6 +101,13 @@ int main(void)
   Serial_Printf("Initializing BE2 sensor...\r\n");
   be2_spi_init();
 
+  be2_write_register(BE2_REG_SYS_CONFIG, 0x80); // 复位
+  wk_delay_ms(200); // 延长至200ms，确保稳定
+
+  // 复位后读取SYS_CONFIG
+  uint8_t sys_config = be2_read_register(BE2_REG_SYS_CONFIG);
+  Serial_Printf("SYS_CONFIG after reset: 0x%02X (expected 0x00)\r\n", sys_config);
+
   uint8_t status = be2_read_register(BE2_REG_STATUS);
   Serial_Printf("Sensor status: 0x%02X\r\n", status);
 
