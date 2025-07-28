@@ -112,30 +112,18 @@ int main(void)
 
   for (uint8_t addr = 3; addr < 0x78; addr++)
   {
-      // 设定地址和写模式
       i2c_transfer_addr_set(I2C2, addr);
       i2c_transfer_dir_set(I2C2, I2C_DIR_TRANSMIT);
-
-      // 生成起始信号
       i2c_start_generate(I2C2);
 
-      // 等待ADDR发送完成
-      while(i2c_flag_get(I2C2, I2C_ADDRF_FLAG) == RESET)
-      {
-          // 可以设置超时避免死循环
-      }
+      uint32_t timeout = 10000;
+      while(i2c_flag_get(I2C2, I2C_ADDRF_FLAG) == RESET && timeout--) {}
 
-      // 检测是否收到ACK（无ACK即失败）
-      if (!i2c_flag_get(I2C2, I2C_ACKFAIL_FLAG))
+      if(timeout && !i2c_flag_get(I2C2, I2C_ACKFAIL_FLAG))
       {
-          // 有设备响应
           printf("Found device at address 0x%02X\r\n", addr);
       }
-
-      // 发送停止信号，清理状态
       i2c_stop_generate(I2C2);
-
-      // 清除标志位
       i2c_flag_clear(I2C2, I2C_ADDRF_FLAG | I2C_ACKFAIL_FLAG);
   }
 //  if(BE2_Init() != 0)
