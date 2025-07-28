@@ -3,9 +3,10 @@
 
 #include "at32f402_405_wk_config.h"
 #include <stdint.h>
+#include "at32f402_405_i2c.h"  // 包含库API头文件
 
 // I2C从设备地址（ADD0=0时，对应手册中I2C从设备地址设置）
-#define BE2_I2C_ADDR           0x32 << 1  // 固定为ADD0=0模式的地址{insert\_element\_0\_}
+#define BE2_I2C_ADDR           0x32   // 固定为ADD0=0模式的地址{insert\_element\_0\_}
 
 // 寄存器地址定义（同之前版本，保持与硬件手册一致）
 #define REG_STATUS             0x00    // 状态寄存器

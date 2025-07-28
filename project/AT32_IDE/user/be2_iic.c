@@ -1,7 +1,6 @@
 #include "be2_iic.h"
 #include "wk_i2c.h"
 #include "Serial.h"
-#include "at32f402_405_i2c.h"  // 包含库API头文件
 #include <string.h>
 #include <math.h>
 
@@ -25,39 +24,74 @@ void BE2_I2C_Init(void) {
  */
 uint8_t BE2_I2C_WriteReg(uint8_t reg, uint8_t data) {
     uint32_t timeout = I2C_TIMEOUT_MS * 1000;
+    uint8_t error = 0;
 
     // 等待总线空闲
-    while(i2c_flag_get(I2C2, I2C_BUSYF_FLAG) && timeout--);
-    if(timeout == 0) return 1;
+    while(i2c_flag_get(I2C2, I2C_BUSYF_FLAG) && timeout--) {
+        if(timeout == 0) {
+            Serial_Printf("I2C Bus Busy Timeout\r\n");
+            return 1;
+        }
+    }
 
     // 生成起始信号
     i2c_start_generate(I2C2);
     timeout = I2C_TIMEOUT_MS * 1000;
-    while(!i2c_flag_get(I2C2, I2C_TDIS_FLAG) && timeout--);  // 等待起始信号发送完成
-    if(timeout == 0) return 1;
+    while(!i2c_flag_get(I2C2, I2C_TDIS_FLAG) && timeout--) {
+        if(timeout == 0) {
+            Serial_Printf("Start Condition Timeout\r\n");
+            i2c_stop_generate(I2C2); // 尝试恢复
+            return 1;
+        }
+    }
 
-    // 设置从机地址和传输方向（写）
-    i2c_transfer_addr_set(I2C2, BE2_I2C_ADDR >> 1);  // 7位地址需右移1位
+    // 发送设备地址（写模式）
+    i2c_transfer_addr_set(I2C2, BE2_I2C_ADDR);
     i2c_transfer_dir_set(I2C2, I2C_DIR_TRANSMIT);
+
+    // 等待地址发送完成
+    timeout = I2C_TIMEOUT_MS * 1000;
+    while(!i2c_flag_get(I2C2, I2C_ADDRF_FLAG) && timeout--) {
+        if(timeout == 0) {
+            Serial_Printf("Address Send Timeout\r\n");
+            i2c_stop_generate(I2C2);
+            return 1;
+        }
+    }
+    i2c_flag_clear(I2C2, I2C_ADDRF_FLAG); // 清除地址标志
 
     // 发送寄存器地址
     i2c_data_send(I2C2, reg);
     timeout = I2C_TIMEOUT_MS * 1000;
-    while(!i2c_flag_get(I2C2, I2C_TDBE_FLAG) && timeout--);  // 等待发送缓冲区空
-    if(timeout == 0) return 1;
+    while(!i2c_flag_get(I2C2, I2C_TDBE_FLAG) && timeout--) {
+        if(timeout == 0) {
+            Serial_Printf("Register Address Send Timeout\r\n");
+            i2c_stop_generate(I2C2);
+            return 1;
+        }
+    }
 
     // 发送数据
     i2c_data_send(I2C2, data);
     timeout = I2C_TIMEOUT_MS * 1000;
-    while(!i2c_flag_get(I2C2, I2C_TDBE_FLAG) && timeout--);
-    if(timeout == 0) return 1;
+    while(!i2c_flag_get(I2C2, I2C_TDBE_FLAG) && timeout--) {
+        if(timeout == 0) {
+            Serial_Printf("Data Send Timeout\r\n");
+            i2c_stop_generate(I2C2);
+            return 1;
+        }
+    }
 
     // 生成停止信号
     i2c_stop_generate(I2C2);
     timeout = I2C_TIMEOUT_MS * 1000;
-    while(!i2c_flag_get(I2C2, I2C_STOPF_FLAG) && timeout--);
-    if(timeout == 0) return 1;
-    i2c_flag_clear(I2C2, I2C_STOPF_FLAG);  // 清除停止标志
+    while(!i2c_flag_get(I2C2, I2C_STOPF_FLAG) && timeout--) {
+        if(timeout == 0) {
+            Serial_Printf("Stop Condition Timeout\r\n");
+            return 1;
+        }
+    }
+    i2c_flag_clear(I2C2, I2C_STOPF_FLAG);
 
     return 0;
 }
@@ -86,7 +120,7 @@ uint8_t BE2_I2C_ReadReg(uint8_t reg, uint8_t *data) {
     if(timeout == 0) return 1;
 
     // 设置从机地址和传输方向（读）
-    i2c_transfer_addr_set(I2C2, BE2_I2C_ADDR >> 1);  // 7位地址
+    i2c_transfer_addr_set(I2C2, BE2_I2C_ADDR);  // 7位地址
     i2c_transfer_dir_set(I2C2, I2C_DIR_RECEIVE);
 
     // 禁用ACK（单字节读取）
@@ -174,13 +208,26 @@ uint8_t BE2_I2C_ReadMultiReg(uint8_t reg, uint8_t *buf, uint16_t len) {
 uint8_t BE2_Init(void) {
     uint8_t whoami;
     uint8_t ret;
+    Serial_Printf("Resetting sensor...\r\n");
+    // 发送复位命令
+	ret = BE2_I2C_WriteReg(REG_SYS_CONFIG, 0x80);
+	wk_delay_ms(100); // 等待复位完成
 
-    // 读取设备ID（WHO_AM_I默认0x32）
+	// 读取设备ID（WHO_AM_I默认0x32）
     ret = BE2_I2C_ReadReg(REG_WHO_AM_I, &whoami);
+    Serial_Printf("WHO_AM_I read: 0x%02X, ret=%d\r\n", whoami, ret);
     if(ret != 0 || whoami != 0x32) {
-        Serial_Printf("BE2 Init Failed! WHO_AM_I=0x%02X\r\n", whoami);
-        return 1;
-    }
+		Serial_Printf("BE2 Init Failed! WHO_AM_I=0x%02X, error=%d\r\n", whoami, ret);
+
+		// 尝试读取其他寄存器验证通信
+		uint8_t status;
+		if(BE2_I2C_ReadReg(REG_STATUS, &status) == 0) {
+			Serial_Printf("Status register: 0x%02X\r\n", status);
+		} else {
+			Serial_Printf("Failed to read status register\r\n");
+		}
+		return 1;
+	}
 
     // 使能寄存器修改（FUN_CONFIG Bit7=1）
     ret |= BE2_I2C_WriteReg(REG_FUN_CONFIG, 0x80);
