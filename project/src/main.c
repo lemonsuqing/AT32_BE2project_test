@@ -108,6 +108,29 @@ int main(void)
   uint8_t sys_config = be2_read_register(BE2_REG_SYS_CONFIG);
   Serial_Printf("SYS_CONFIG after reset: 0x%02X (expected 0x00)\r\n", sys_config);
 
+  // 读取某些寄存器
+    uint8_t reg1 = be2_read_register(0x03);
+    Serial_Printf("0x%02X(默认0x03)\r\n", reg1);
+
+    uint8_t reg2 = be2_read_register(0x04);
+	Serial_Printf("0x%02X(默认0x37)\r\n", reg2);
+
+	uint8_t reg3 = be2_read_register(0x05);
+	Serial_Printf("0x%02X(默认0x04)\r\n", reg3);
+
+	uint8_t reg4 = be2_read_register(0x06);
+	Serial_Printf("0x%02X(默认0x08)\r\n", reg4);
+
+	uint8_t target = 0x37;
+	be2_write_register(0x04, target);
+	wk_delay_us(10);  // 等待传感器处理
+	uint8_t actual = be2_read_register(0x04);
+	if(actual != target) {
+	    Serial_Printf("WARN: DATA_ENABLE write fail! (0x%02X vs 0x%02X)\r\n", actual, target);
+	}else{
+		Serial_Printf("actual:0x%02X == target:0x%02X\r\n", actual, target);
+	}
+
   uint8_t status = be2_read_register(BE2_REG_STATUS);
   Serial_Printf("Sensor status: 0x%02X\r\n", status);
 
