@@ -3,6 +3,7 @@
 
 #include "at32f402_405_wk_config.h"
 #include <stdint.h>
+#include "wk_system.h"
 #include "at32f402_405_i2c.h"  // 包含库API头文件
 
 // I2C从设备地址（ADD0=0时，对应手册中I2C从设备地址设置）
