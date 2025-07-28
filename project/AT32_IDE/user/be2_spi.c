@@ -18,12 +18,47 @@ static void spi_write_buf(uint8_t *tx, uint8_t *rx, uint16_t len) {
     LPMS_CS_HIGH();
 }
 
+static void print_buffer(const char *prefix, uint8_t *buf, uint16_t len) {
+    Serial_Printf("%s:", prefix);
+    for (uint16_t i = 0; i < len; i++) {
+        Serial_Printf(" %02X", buf[i]);
+    }
+    Serial_Printf("\r\n");
+}
+
+// SPI发送接收一个缓冲区数据（不加延时）
+static void spi_write_buf_debug(uint8_t *tx, uint8_t *rx, uint16_t len) {
+    LPMS_CS_LOW();
+    for (uint16_t i = 0; i < len; i++) {
+        rx[i] = spi2_rw_byte(tx[i]);
+    }
+    LPMS_CS_HIGH();
+}
+
+//static void spi_write_buf(uint8_t *tx, uint8_t *rx, uint16_t len) {
+//    LPMS_CS_LOW();
+//    // wk_delay_ms(20); // 建议去掉延时
+//    for (uint16_t i = 0; i < len; i++) {
+//        rx[i] = spi2_rw_byte(tx[i]);
+//    }
+//    // wk_delay_ms(20); // 建议去掉延时
+//    LPMS_CS_HIGH();
+//}
+
 // 进入命令模式
 bool lpms_enter_command_mode(void) {
-    uint8_t cmd[] = { 0x3A, 0x01, 0x00, 0x06, 0xF1 };
-    uint8_t rx[sizeof(cmd)];
-    spi_write_buf(cmd, rx, sizeof(cmd));
-    return true;
+	uint8_t cmd[] = { 0x3A, 0x01, 0x00, 0x06, 0xF1 };
+	uint8_t rx[sizeof(cmd)];
+
+	spi_write_buf_debug(cmd, rx, sizeof(cmd));
+	print_buffer("[CMD Mode TX]", cmd, sizeof(cmd));
+	print_buffer("[CMD Mode RX]", rx, sizeof(cmd));
+
+	// 简单判断返回包是否有效（首尾字节匹配）
+	if (rx[0] == 0x3A && rx[sizeof(cmd) - 1] == 0xF1) {
+		return true;
+	}
+	return false;
 }
 
 // 设置输出为欧拉角
@@ -61,27 +96,22 @@ void lpms_start_streaming(void) {
 
 // 读取欧拉角数据（从传感器自动发回的数据包中解析）
 bool lpms_read_euler_angles(lpms_data_t *data) {
+    uint8_t tx[32] = {0};
     uint8_t rx[32];
-    uint8_t tx[32] = {0x00};
 
-    // 接收 32 字节数据包
-    spi_write_buf(tx, rx, 32);
+    spi_write_buf_debug(tx, rx, 32);
+    print_buffer("[Read Euler TX]", tx, 32);
+    print_buffer("[Read Euler RX]", rx, 32);
 
-    // 找到包头 0x3A
-    int start = -1;
-    for (int i = 0; i < 30; ++i) {
-        if (rx[i] == 0x3A && rx[i + 31] == 0xF1) {
-            start = i;
-            break;
-        }
+    if (rx[0] != 0x3A || rx[31] != 0xF1) {
+        Serial_Printf("Invalid data packet header or footer\r\n");
+        return false;
     }
 
-    if (start < 0) return false;
-
-    // 数据解析（假设：roll/pitch/yaw 每个 float 占4字节）
-    memcpy(&data->roll,  &rx[start + 7],  4);
-    memcpy(&data->pitch, &rx[start + 11], 4);
-    memcpy(&data->yaw,   &rx[start + 15], 4);
+    // 解析roll, pitch, yaw，假设为float格式
+    memcpy(&data->roll,  &rx[7],  4);
+    memcpy(&data->pitch, &rx[11], 4);
+    memcpy(&data->yaw,   &rx[15], 4);
 
     return true;
 }
