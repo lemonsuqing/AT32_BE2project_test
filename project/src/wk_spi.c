@@ -120,10 +120,9 @@ void spi2_cs_disable(void) {
 uint8_t spi2_read_write_byte(uint8_t data) {
     uint32_t timeout = 10000;
 
-    // µÈ´ı·¢ËÍ»º³åÇø¿Õ
     while (spi_i2s_flag_get(SPI2, SPI_I2S_TDBE_FLAG) == RESET) {
         if (--timeout == 0) {
-            Serial_Printf("SPI TX timeout! STS:0x%04X\r\n", SPI2->sts);
+            Serial_Printf("[SPI] TX timeout, STS:0x%04X\r\n", SPI2->sts);
             return 0xFF;
         }
     }
@@ -133,12 +132,14 @@ uint8_t spi2_read_write_byte(uint8_t data) {
     timeout = 10000;
     while (spi_i2s_flag_get(SPI2, SPI_I2S_RDBF_FLAG) == RESET) {
         if (--timeout == 0) {
-            Serial_Printf("SPI RX timeout! STS:0x%04X\r\n", SPI2->sts);
+            Serial_Printf("[SPI] RX timeout, STS:0x%04X\r\n", SPI2->sts);
             return 0xFF;
         }
     }
 
     uint8_t ret = spi_i2s_data_receive(SPI2);
+    Serial_Printf("[SPI] Sent: 0x%02X, Received: 0x%02X\r\n", data, ret);
     return ret;
 }
+
 /* add user code end 1 */
