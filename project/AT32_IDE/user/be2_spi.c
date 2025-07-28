@@ -95,29 +95,53 @@ static uint16_t calculate_lrc(uint8_t *data, uint16_t len) {
 
 // 发送LPBUS指令并接收响应（遵循20220802用户手册3.3节LPBUS协议）
 static bool be2_send_command(uint8_t *tx_buf, uint16_t tx_len, uint8_t *rx_buf, uint16_t rx_max_len, uint16_t *rx_len) {
-    LPMS_CS_LOW();  // 拉低片选，选中传感器（20230707硬件手册3.2节SPI片选信号）
+    // 调试：打印片选信号状态（参考20230707硬件手册3.2节SPI片选控制）
+    Serial_Printf("[SPI] 片选拉低，开始通信...\r\n");
+    LPMS_CS_LOW();  // 拉低片选，选中传感器
     wk_delay_us(5);
+
+    // 调试：打印发送的指令包（参考20220802用户手册表2-1数据包结构）
+    Serial_Printf("[发送] 指令包长度: %d 字节，内容: ", tx_len);
+    for (uint16_t i = 0; i < tx_len; i++) {
+        Serial_Printf("0x%02X ", tx_buf[i]);
+    }
+    Serial_Printf("\r\n");
 
     // 发送命令帧
     for (uint16_t i = 0; i < tx_len; i++) {
-        spi2_rw_byte(tx_buf[i]);  // 调用SPI收发函数
+        uint8_t recv_during_send = spi2_rw_byte(tx_buf[i]);  // 发送时的回传字节
+        // 调试：打印每字节发送及同时接收的内容（SPI全双工特性）
+        Serial_Printf("[发送] 第%d字节: 0x%02X，接收回传: 0x%02X\r\n", i, tx_buf[i], recv_during_send);
     }
 
     // 接收响应帧
     *rx_len = 0;
     uint8_t frame_end = 0;
+    Serial_Printf("[接收] 开始接收响应...\r\n");
     while (*rx_len < rx_max_len && !frame_end) {
-        rx_buf[*rx_len] = spi2_rw_byte(0xFF);  // 发送 dummy 字节读取响应
+        rx_buf[*rx_len] = spi2_rw_byte(0xFF);  // 发送dummy字节读取响应
+        // 调试：打印每字节接收内容
+        Serial_Printf("[接收] 第%d字节: 0x%02X\r\n", *rx_len, rx_buf[*rx_len]);
 
-        // 检测包尾（0x0D 0x0A，20220802用户手册表2-1）
+        // 检测包尾（0x0D 0x0A，20220802用户手册表2-1定义）
         if (*rx_len > 0 && rx_buf[*rx_len-1] == 0x0D && rx_buf[*rx_len] == 0x0A) {
             frame_end = 1;
+            Serial_Printf("[接收] 检测到包尾，结束接收\r\n");
         }
         (*rx_len)++;
     }
 
+    // 调试：打印完整接收数据
+    Serial_Printf("[接收] 响应总长度: %d 字节，完整内容: ", *rx_len);
+    for (uint16_t i = 0; i < *rx_len; i++) {
+        Serial_Printf("0x%02X ", rx_buf[i]);
+    }
+    Serial_Printf("\r\n");
+
     wk_delay_us(5);
     LPMS_CS_HIGH();  // 拉高片选，结束通信
+    Serial_Printf("[SPI] 片选拉高，通信结束\r\n");
+
     return frame_end;
 }
 
