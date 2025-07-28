@@ -102,5 +102,14 @@ void wk_spi2_init(void)
 }
 
 /* add user code begin 1 */
-
+uint8_t spi2_rw_byte(uint8_t byte) {
+    // 等待发送缓冲区为空
+    while (spi_i2s_flag_get(SPI2, SPI_I2S_TDBE_FLAG) == RESET);
+    // 发送数据
+    spi_i2s_data_transmit(SPI2, byte);
+    // 等待接收缓冲区有数据
+    while (spi_i2s_flag_get(SPI2, SPI_I2S_RDBF_FLAG) == RESET);
+    // 返回接收数据
+    return spi_i2s_data_receive(SPI2);
+}
 /* add user code end 1 */

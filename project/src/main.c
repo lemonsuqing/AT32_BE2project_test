@@ -96,35 +96,56 @@ int main(void)
   wk_spi2_init();
 
   /* add user code begin 2 */
-  be2_spi_init_cs_gpio();
 
-  wk_delay_ms(1000);
-
-  Serial_Printf("=== LPMS-BE2 SPI LPBUS Test ===\r\n");
-
-  be2_spi_init_cs_gpio();
-  wk_spi2_init();
-  wk_delay_ms(500);
-
-  // Step 1: Enter command mode
-  Serial_Printf("Step 1: Enter Command Mode...\r\n");
-  if (be2_enter_command_mode()) {
-      Serial_Printf("✅ Entered command mode.\r\n");
-  } else {
-      Serial_Printf("❌ Failed to enter command mode.\r\n");
+//  be2_spi_init_cs_gpio();
+//
+//  wk_delay_ms(1000);
+//
+//  Serial_Printf("=== LPMS-BE2 SPI LPBUS Test ===\r\n");
+//
+//  be2_spi_init_cs_gpio();
+//  wk_spi2_init();
+//  wk_delay_ms(500);
+//
+//  // Step 1: Enter command mode
+//  Serial_Printf("Step 1: Enter Command Mode...\r\n");
+//  if (be2_enter_command_mode()) {
+//      Serial_Printf("✅ Entered command mode.\r\n");
+//  } else {
+//      Serial_Printf("❌ Failed to enter command mode.\r\n");
+//  }
+//
+//  // Step 2: Read WHO_AM_I (0x74)
+//  Serial_Printf("Step 2: Read WHO_AM_I (0x74)...\r\n");
+//  uint8_t who = be2_read_whoami_lpb();
+//  Serial_Printf("WHO_AM_I = 0x%02X %s\r\n", who, (who == 0x32) ? "✅ OK" : "❌ ERROR");
+  Serial_Printf("=== Init LPMS-BE2 ===\r\n");
+  if (!be2_sensor_init()) {
+	  Serial_Printf("❌ xxx Init ERROR xxx\r\n");
+	  while(1); // 初始化失败
   }
-
-  // Step 2: Read WHO_AM_I (0x74)
-  Serial_Printf("Step 2: Read WHO_AM_I (0x74)...\r\n");
-  uint8_t who = be2_read_whoami_lpb();
-  Serial_Printf("WHO_AM_I = 0x%02X %s\r\n", who, (who == 0x32) ? "✅ OK" : "❌ ERROR");
-
+  BE2_SensorData data;
 
   /* add user code end 2 */
 
   while(1)
   {
     /* add user code begin 3 */
+	  if (be2_read_sensor_data(&data)) {
+		  Serial_Printf("=== 传感器数据 ===\r\n");
+		  Serial_Printf("时间戳: %u\r\n", data.timestamp);
+		  Serial_Printf("加速度: %.3f, %.3f, %.3f g\r\n",
+					  data.acc_calibrated[0],
+					  data.acc_calibrated[1],
+					  data.acc_calibrated[2]);
+		  Serial_Printf("角速度: %.3f, %.3f, %.3f dps\r\n",
+					  data.gyro_alignment[0],
+					  data.gyro_alignment[1],
+					  data.gyro_alignment[2]);
+		  Serial_Printf("欧拉角: roll=%.2f, pitch=%.2f, yaw=%.2f 度\r\n",
+					  data.euler[0], data.euler[1], data.euler[2]);
+	  }
+	  wk_delay_ms(100); // 10Hz读取频率
 //	  if (whoami == 0x32) {  // 仅在通讯正常时读取
 //	        be2_read_sensors();
 //	      }
