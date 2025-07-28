@@ -8,14 +8,24 @@
 // 初始化传感器
 void be2_spi_init(void) {
     // 重置传感器
-    be2_write_register(BE2_REG_SYS_CONFIG, 0x80);
-    wk_delay_ms(100);
+	be2_write_register(BE2_REG_SYS_CONFIG, 0x80);
+	wk_delay_ms(100);
 
-    // 验证设备ID (应为0x32)
-    if(be2_read_register(BE2_REG_WHO_AM_I) != 0x32) {
-        // 设备ID错误
-        while(1);
-    }
+	// 验证设备ID (应为0x32)
+	uint8_t who_am_i = be2_read_register(BE2_REG_WHO_AM_I);
+	if(who_am_i != 0x32) {
+		// 打印错误信息而不是死循环
+		printf("Error: Incorrect device ID. Expected 0x32, got 0x%02X\r\n", who_am_i);
+		// 继续初始化，但数据可能不可靠
+	} else {
+		printf("Device ID verified: 0x%02X\r\n", who_am_i);
+	}
+
+//    // 验证设备ID (应为0x32)
+//    if(be2_read_register(BE2_REG_WHO_AM_I) != 0x32) {
+//        // 设备ID错误
+//        while(1);
+//    }
 
     // 配置数据输出 (使能时间戳、加速度、陀螺仪、四元数、欧拉角)
     be2_write_register(BE2_REG_DATA_ENABLE, 0x7F); // 0b01111111

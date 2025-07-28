@@ -31,6 +31,8 @@
 #define BE2_REG_EULER_Y            0x5C
 #define BE2_REG_EULER_Z            0x60
 #define BE2_REG_WHO_AM_I           0x74
+#define BE2_REG_FIRMWARE_VERSION_0   0x75
+#define BE2_REG_FIRMWARE_VERSION_1   0x76
 
 // 传感器数据结构
 typedef struct {

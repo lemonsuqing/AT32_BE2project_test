@@ -90,15 +90,29 @@ int main(void)
   wk_timebase_init();
 
   /* init usart1 function. */
-  wk_usart1_init();
+  wk_usart1_init();printf("System initialized. Starting LPMS-BE2 test...\r\n");
 
   /* init spi2 function. */
-  wk_spi2_init();
+  wk_spi2_init();printf("SPI2 initialized.\r\n");
 
   /* add user code begin 2 */
+  wk_delay_ms(100);
+
+  printf("Initializing BE2 sensor...\r\n");
   be2_spi_init();
 
-  printf("LPMS-BE2 SPI Interface Initialized\r\n");
+  uint8_t status = be2_read_register(BE2_REG_STATUS);
+    printf("Sensor status: 0x%02X\r\n", status);
+
+    // 尝试读取固件版本
+    uint8_t fw_ver0 = be2_read_register(BE2_REG_FIRMWARE_VERSION_0);
+    uint8_t fw_ver1 = be2_read_register(BE2_REG_FIRMWARE_VERSION_1);
+    printf("Firmware version: %d.%d.%d\r\n",
+           (fw_ver1 >> 4) & 0x0F,  // 主版本
+           fw_ver1 & 0x0F,         // 次版本
+           fw_ver0 & 0x0F);        // 修订版本
+
+    printf("LPMS-BE2 initialization complete.\r\n");
 
 
   /* add user code end 2 */
@@ -106,6 +120,12 @@ int main(void)
   while(1)
   {
     /* add user code begin 3 */
+	  float roll = be2_read_float(BE2_REG_EULER_X);
+	  float pitch = be2_read_float(BE2_REG_EULER_Y);
+	  float yaw = be2_read_float(BE2_REG_EULER_Z);
+
+	  printf("Roll: %.2f, Pitch: %.2f, Yaw: %.2f\r\n", roll, pitch, yaw);
+
 	 be2_read_data(&sensor_data);
 
 	 // 打印欧拉角数据
