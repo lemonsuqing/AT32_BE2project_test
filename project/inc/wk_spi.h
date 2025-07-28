@@ -37,6 +37,7 @@ extern "C" {
 
 /* private includes -------------------------------------------------------------*/
 /* add user code begin private includes */
+#include "Serial.h"
 uint8_t spi2_rw_byte(uint8_t tx_data);
 void lpms_spi_read_bytes(uint8_t addr, uint8_t *buf, uint8_t len);
 float lpms_spi_read_float(uint8_t start_addr);
