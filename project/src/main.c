@@ -36,7 +36,8 @@
 /* add user code begin private includes */
 #include "Serial.h"
 //#include "be2_spi.h"
-#include "be2_iic.h"
+//#include "be2_iic.h"
+#include "oled.h"
 /* add user code end private includes */
 
 /* private typedef -----------------------------------------------------------*/
@@ -107,8 +108,14 @@ int main(void)
   /* add user code begin 2 */
   wk_delay_ms(100);
 
-  BE2_I2C_Init();    // 初始化BE2的I2C通信
-  wk_delay_ms(100);  // 等待传感器上电稳定
+  OLED_Init();           // OLED初始化
+
+  OLED_ShowString(0, 0, "AT32F405");    // 第0行显示字符串
+  OLED_ShowNumber(0, 2, 123456, 6);        // 第2行显示数字
+  OLED_ShowString(0, 4, "OLED Test");   // 第4行显示字符串
+
+//  BE2_I2C_Init();    // 初始化BE2的I2C通信
+//  wk_delay_ms(100);  // 等待传感器上电稳定
 
 
 //  if(BE2_Init() != 0)

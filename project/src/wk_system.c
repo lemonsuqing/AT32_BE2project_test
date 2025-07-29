@@ -52,6 +52,10 @@ void delay_us(uint32_t delay)
   } while(delta < delay_ticks);
 }
 
+void wk_delay_us(uint32_t us){
+	delay_us(us);
+}
+
 /**
   * @brief  this function provides minimum delay (in milliseconds).
   * @param  delay variable specifies the delay time length, in milliseconds.
