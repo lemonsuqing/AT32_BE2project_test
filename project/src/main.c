@@ -111,20 +111,12 @@ int main(void)
 
   /* add user code begin 2 */
   wk_delay_ms(100);
-  // 4. OLED初始化
-  OLED_Init(OLED_TIMEOUT);   // 初始化OLED屏幕
-  OLED_Clear(OLED_TIMEOUT);  // 清屏（确保初始状态干净）
+  OLED_Init(&hi2c);
 
-  // 5. 显示内容（添加超时参数）
-  // 第0页（行）显示字符串
-  OLED_ShowString(0, 0, "AT32F405 Test", OLED_TIMEOUT);  // x=0, y=0（页地址0）
-
-  // 第2页显示数字（6位）
-  OLED_ShowNumber(0, 2, 123456, 6, OLED_TIMEOUT);        // x=0, y=2（页地址2）
-
-  // 第4页显示传感器相关信息
-  OLED_ShowString(0, 4, "OLED: OK", OLED_TIMEOUT);       // x=0, y=4（页地址4）
-  OLED_ShowString(0, 6, "Temp: 25.5C", OLED_TIMEOUT);    // x=0, y=6（页地址6）
+  // 显示测试内容
+  OLED_ShowString(0, 0, "AT32F405");
+  OLED_ShowString(0, 2, "OLED Test");
+  OLED_ShowNumber(0, 4, 123456, 6);
 
 
 //  BE2_I2C_Init();    // 初始化BE2的I2C通信

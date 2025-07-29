@@ -68,7 +68,7 @@ void wk_i2c2_init(void)
   gpio_init_struct.gpio_pins = GPIO_PINS_1;
   gpio_init(GPIOA, &gpio_init_struct);
 
-  i2c_init(I2C2, 0, 100000UL);
+  i2c_init(I2C2, 0, 0x30D08080);
   i2c_own_address1_set(I2C2, I2C_ADDRESS_MODE_7BIT, 0x0);
   i2c_ack_enable(I2C2, TRUE);
   i2c_clock_stretch_enable(I2C2, TRUE);
