@@ -42,7 +42,11 @@
 
 /* private typedef -----------------------------------------------------------*/
 /* add user code begin private typedef */
-
+i2c_handle_type hi2c = {
+    .i2cx = I2C2,  // 绑定到I2C2外设
+    .dma_tx_channel = NULL,  // 不使用DMA时设为NULL
+    .dma_rx_channel = NULL
+};
 /* add user code end private typedef */
 
 /* private define ------------------------------------------------------------*/
@@ -62,7 +66,7 @@
 
 /* private function prototypes --------------------------------------------*/
 /* add user code begin function prototypes */
-
+#define OLED_TIMEOUT 1000
 /* add user code end function prototypes */
 
 /* private user code ---------------------------------------------------------*/
@@ -107,12 +111,21 @@ int main(void)
 
   /* add user code begin 2 */
   wk_delay_ms(100);
+  // 4. OLED初始化
+  OLED_Init(OLED_TIMEOUT);   // 初始化OLED屏幕
+  OLED_Clear(OLED_TIMEOUT);  // 清屏（确保初始状态干净）
 
-  OLED_Init();           // OLED初始化
+  // 5. 显示内容（添加超时参数）
+  // 第0页（行）显示字符串
+  OLED_ShowString(0, 0, "AT32F405 Test", OLED_TIMEOUT);  // x=0, y=0（页地址0）
 
-  OLED_ShowString(0, 0, "AT32F405");    // 第0行显示字符串
-  OLED_ShowNumber(0, 2, 123456, 6);        // 第2行显示数字
-  OLED_ShowString(0, 4, "OLED Test");   // 第4行显示字符串
+  // 第2页显示数字（6位）
+  OLED_ShowNumber(0, 2, 123456, 6, OLED_TIMEOUT);        // x=0, y=2（页地址2）
+
+  // 第4页显示传感器相关信息
+  OLED_ShowString(0, 4, "OLED: OK", OLED_TIMEOUT);       // x=0, y=4（页地址4）
+  OLED_ShowString(0, 6, "Temp: 25.5C", OLED_TIMEOUT);    // x=0, y=6（页地址6）
+
 
 //  BE2_I2C_Init();    // 初始化BE2的I2C通信
 //  wk_delay_ms(100);  // 等待传感器上电稳定
