@@ -26,7 +26,7 @@ typedef enum
 
 /* I2C配置参数（根据实际硬件修改） */
 #define OLED_I2C_HANDLE      hi2c2
-#define OLED_I2C_ADDRESS     0x3D  // OLED的I2C地址（7位地址，已左移1位）
+#define OLED_I2C_ADDRESS     0x3C  // OLED的I2C地址（7位地址，已左移1位）
 
 /* 功能函数声明 */
 // 写数据（I2C底层）

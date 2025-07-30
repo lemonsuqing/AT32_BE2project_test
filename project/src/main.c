@@ -39,6 +39,7 @@
 //#include "be2_iic.h"
 //#include "oled.h"
 #include "hardware_oled.h"
+#include "i2c_application.h"
 /* add user code end private includes */
 
 /* private typedef -----------------------------------------------------------*/
@@ -63,7 +64,45 @@
 
 /* private function prototypes --------------------------------------------*/
 /* add user code begin function prototypes */
+void I2C_Scan_WK(i2c_type *i2c) {
+    uint8_t addr;
+    uint32_t timeout;
 
+    Serial_Printf("Starting I2C Scan (WK Library)...\r\n");
+    for (addr = 0x08; addr <= 0x77; addr++) {
+        timeout = 100000; // 超时计数，约100ms
+
+        // 生成起始信号
+        i2c_start_generate(i2c);
+
+        // 设置设备地址（左移1位，包含写方向位）
+        i2c_transfer_addr_set(i2c, addr << 1);
+        i2c_transfer_dir_set(i2c, I2C_DIR_TRANSMIT);
+
+        // 等待地址响应：检查地址匹配标志或超时/ACK失败
+        while (!i2c_flag_get(i2c, I2C_ADDRF_FLAG) && timeout--) {
+            // 若检测到ACK失败，提前退出等待
+            if (i2c_flag_get(i2c, I2C_ACKFAIL_FLAG)) {
+                break;
+            }
+            wk_delay_us(1); // 微秒级延时
+        }
+
+        // 若未超时且未检测到ACK失败，说明设备存在
+        if (timeout > 0 && !i2c_flag_get(i2c, I2C_ACKFAIL_FLAG)) {
+            Serial_Printf("Found device at 0x%02X\r\n", addr);
+        }
+
+        // 生成停止信号，结束本次通信
+        i2c_stop_generate(i2c);
+        // 清除标志位，为下次检测做准备
+        i2c_flag_clear(i2c, I2C_ADDRF_FLAG | I2C_ACKFAIL_FLAG);
+
+        // 短暂延时，避免总线冲突
+        wk_delay_ms(1);
+    }
+    Serial_Printf("I2C Scan Completed\r\n");
+}
 /* add user code end function prototypes */
 
 /* private user code ---------------------------------------------------------*/
@@ -108,11 +147,12 @@ int main(void)
 
   /* add user code begin 2 */
   wk_delay_ms(100);
-  OLED_Init();
-  OLED_FullyClear();
-
-  OLED_ShowStr(0, 0, (uint8_t *)"Hello", 1);
-  OLED_RefreshRAM();
+//  OLED_Init();
+//  OLED_FullyClear();
+//
+//  OLED_ShowStr(0, 0, (uint8_t *)"Hello", 1);
+//  OLED_RefreshRAM();
+  I2C_Scan_WK(I2C2);
 
   /* add user code end 2 */
 
