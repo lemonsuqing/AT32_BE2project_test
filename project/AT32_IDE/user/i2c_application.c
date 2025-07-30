@@ -23,7 +23,7 @@
   */
 
 #include "i2c_application.h"
-
+i2c_handle_type hi2c2;
 /** @addtogroup AT32F402_405_middlewares_i2c_application_library
   * @{
   */

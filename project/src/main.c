@@ -37,7 +37,8 @@
 #include "Serial.h"
 //#include "be2_spi.h"
 //#include "be2_iic.h"
-#include "oled.h"
+//#include "oled.h"
+#include "hardware_oled.h"
 /* add user code end private includes */
 
 /* private typedef -----------------------------------------------------------*/
@@ -108,18 +109,22 @@ int main(void)
   /* add user code begin 2 */
   wk_delay_ms(100);
   OLED_Init();
+  OLED_FullyClear();
+
+  OLED_ShowStr(0, 0, (uint8_t *)"Hello", 1);
+  OLED_RefreshRAM();
 
   /* add user code end 2 */
 
   while(1)
   {
     /* add user code begin 3 */
-	OLED_ShowChar(1,1,'A');//显示一个字符
-	OLED_ShowString(1,3,"HelloWorld");//显示字符串
-	OLED_ShowNum(2,1,12345,5);//显示无符号十进制数
-	OLED_ShowSignedNum(2,7,-66,2);//显示有符号十进制数
-	OLED_ShowHexNum(3,1,0XAA66,4);//显示16进制数字
-	OLED_ShowBinNum(4,1,0XAA55,16);//显示二进制
+//	OLED_ShowChar(1,1,'A');//显示一个字符
+//	OLED_ShowString(1,3,"HelloWorld");//显示字符串
+//	OLED_ShowNum(2,1,12345,5);//显示无符号十进制数
+//	OLED_ShowSignedNum(2,7,-66,2);//显示有符号十进制数
+//	OLED_ShowHexNum(3,1,0XAA66,4);//显示16进制数字
+//	OLED_ShowBinNum(4,1,0XAA55,16);//显示二进制
 //  wk_delay_ms(200);  // 控制读取频率（与手册中默认100Hz输出兼容）
     /* add user code end 3 */
   }
