@@ -40,6 +40,7 @@
 //#include "oled.h"
 #include "hardware_oled.h"
 #include "i2c_application.h"
+#include "be2_software_iic.h"
 /* add user code end private includes */
 
 /* private typedef -----------------------------------------------------------*/
@@ -64,52 +65,7 @@
 
 /* private function prototypes --------------------------------------------*/
 /* add user code begin function prototypes */
-void I2C_Scan_WK(i2c_type *i2c) {
-    uint8_t addr;
-    uint32_t timeout;
 
-    Serial_Printf("Starting I2C Scan (WK Library)...\r\n");
-    for (addr = 0x08; addr <= 0x77; addr++) {
-        timeout = 100000; // 超时计数，约100ms
-        while (i2c_flag_get(i2c, I2C_BUSYF_FLAG) != RESET && timeout--) {
-			wk_delay_us(1);
-		}
-		if (timeout == 0) {
-			Serial_Printf("Bus busy, skip addr 0x%02X\r\n", addr);
-			continue;
-		}
-
-        // 生成起始信号
-        i2c_start_generate(i2c);
-
-        // 设置设备地址（左移1位，包含写方向位）
-        i2c_transfer_addr_set(i2c, addr << 1);
-        i2c_transfer_dir_set(i2c, I2C_DIR_TRANSMIT);
-
-        // 等待地址响应：检查地址匹配标志或超时/ACK失败
-        while (!i2c_flag_get(i2c, I2C_ADDRF_FLAG) && timeout--) {
-            // 若检测到ACK失败，提前退出等待
-            if (i2c_flag_get(i2c, I2C_ACKFAIL_FLAG)) {
-                break;
-            }
-            wk_delay_us(1); // 微秒级延时
-        }
-
-        // 若未超时且未检测到ACK失败，说明设备存在
-        if (timeout > 0 && !i2c_flag_get(i2c, I2C_ACKFAIL_FLAG)) {
-            Serial_Printf("Found device at 0x%02X\r\n", addr);
-        }
-
-        // 生成停止信号，结束本次通信
-        i2c_stop_generate(i2c);
-        // 清除标志位，为下次检测做准备
-        i2c_flag_clear(i2c, I2C_ADDRF_FLAG | I2C_ACKFAIL_FLAG);
-
-        // 短暂延时，避免总线冲突
-        wk_delay_ms(1);
-    }
-    Serial_Printf("I2C Scan Completed\r\n");
-}
 /* add user code end function prototypes */
 
 /* private user code ---------------------------------------------------------*/
@@ -154,25 +110,44 @@ int main(void)
 
   /* add user code begin 2 */
   wk_delay_ms(100);
-//  OLED_Init();
-//  OLED_FullyClear();
-//
-//  OLED_ShowStr(0, 0, (uint8_t *)"Hello", 1);
-//  OLED_RefreshRAM();
-  I2C_Scan_WK(I2C2);
+  BE2_IIC_Init();  // 配置 SCL/SDA 引脚为推挽输出、上拉，初始化时序
+
+  float ax = 0.0f, ay = 0.0f, az = 0.0f;       // 加速度计数据（单位：g）
+  float gx = 0.0f, gy = 0.0f, gz = 0.0f;       // 陀螺仪数据（单位：dps）
+  float roll = 0.0f, pitch = 0.0f, yaw = 0.0f; // 欧拉角数据（单位：度）
+  uint8_t ret;                                 // 存储读取函数的返回值
 
   /* add user code end 2 */
 
   while(1)
   {
     /* add user code begin 3 */
-//	OLED_ShowChar(1,1,'A');//显示一个字符
-//	OLED_ShowString(1,3,"HelloWorld");//显示字符串
-//	OLED_ShowNum(2,1,12345,5);//显示无符号十进制数
-//	OLED_ShowSignedNum(2,7,-66,2);//显示有符号十进制数
-//	OLED_ShowHexNum(3,1,0XAA66,4);//显示16进制数字
-//	OLED_ShowBinNum(4,1,0XAA55,16);//显示二进制
-//  wk_delay_ms(200);  // 控制读取频率（与手册中默认100Hz输出兼容）
+	  ret = BE2_ReadAccelerometer(&ax, &ay, &az);
+	  if (ret == 0){
+		  Serial_Printf("[Accelerometer] ax=%.2f g, ay=%.2f g, az=%.2f g\r\n", ax, ay, az);
+	  }else{
+		  // 错误码含义：1=设备无应答，2=寄存器地址无应答，3=读操作无应答
+		  Serial_Printf("[Error] Accelerometer read failed! Code: %d\r\n", ret);
+	  }
+
+
+	  // --------------------- 读取陀螺仪数据 ---------------------
+	  ret = BE2_ReadGyroscope(&gx, &gy, &gz);
+	  if (ret == 0){
+		  Serial_Printf("[Gyroscope]    gx=%.2f dps, gy=%.2f dps, gz=%.2f dps\r\n", gx, gy, gz);
+	  }else{
+		  Serial_Printf("[Error] Gyroscope read failed! Code: %d\r\n", ret);
+	  }
+
+
+	  // --------------------- 读取欧拉角数据 ---------------------
+	  ret = BE2_ReadEulerAngle(&roll, &pitch, &yaw);
+	  if (ret == 0){
+		  Serial_Printf("[Euler Angle]  roll=%.2f °, pitch=%.2f °, yaw=%.2f °\r\n", roll, pitch, yaw);
+	  }else{
+		  Serial_Printf("[Error] Euler Angle read failed! Code: %d\r\n", ret);
+	  }
+	wk_delay_ms(200);  // 控制读取频率（与手册中默认100Hz输出兼容）
     /* add user code end 3 */
   }
 }
