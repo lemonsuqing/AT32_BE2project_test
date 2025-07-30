@@ -208,8 +208,6 @@ int main(void)
   {
     /* add user code begin 3 */
 
-
-
 	wk_delay_ms(500);  // 每500ms读取一次（参考文档默认输出频率）
     /* add user code end 3 */
   }

@@ -51,21 +51,25 @@ static uint8_t i2c_recv_bit(void) {
 }
 
 static void i2c_send_byte(uint8_t byte) {
+    Serial_Printf("[I2C] Sending byte 0x%02X: ", byte);
     for (int i = 0; i < 8; i++) {
-        i2c_send_bit(byte & 0x80);
+        uint8_t bit = (byte & 0x80) ? 1 : 0;
+        Serial_Printf("%d", bit);
+        i2c_send_bit(bit);
         byte <<= 1;
     }
+    Serial_Printf("\r\n");
 }
 
 static uint8_t i2c_wait_ack(void) {
-    uint8_t ack;
     BE2_SDA_H(); // release SDA
     delay_us(1);
     BE2_SCL_H();
     delay_us(2);
-    ack = BE2_SDA_READ();
+    uint8_t ack = BE2_SDA_READ();
     BE2_SCL_L();
-    return (ack == 0); // 0 = ACK
+    Serial_Printf("[I2C] Read ACK bit: %d\r\n", ack);
+    return (ack == 0); // ACK is 0
 }
 
 static uint8_t i2c_recv_byte(uint8_t ack) {
@@ -96,8 +100,16 @@ void BE2_I2C_Init(void) {
 
 uint8_t BE2_I2C_CheckDevice(void) {
     i2c_start();
-    i2c_send_byte((BE2_I2C_ADDR << 1) | 0);  // Write address
+    uint8_t addr = (BE2_I2C_ADDR << 1) | 0;
+    Serial_Printf("[I2C] Send Addr 0x%02X (WRITE)\r\n", addr);
+    i2c_send_byte(addr);
     uint8_t ack = i2c_wait_ack();
+
+    if (ack)
+        Serial_Printf("[I2C] Got ACK from device.\r\n");
+    else
+        Serial_Printf("[I2C] No ACK received.\r\n");
+
     i2c_stop();
     return ack;
 }
