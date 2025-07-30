@@ -30,4 +30,11 @@ uint8_t BE2_ReadAccelerometer(float *ax, float *ay, float *az);
 uint8_t BE2_ReadGyroscope(float *gx, float *gy, float *gz);
 uint8_t BE2_ReadEulerAngle(float *roll, float *pitch, float *yaw);
 
+void IIC_Start(void);
+void IIC_Stop(void);
+void IIC_SendAck(uint8_t ack);
+uint8_t IIC_WaitAck(void);
+void IIC_SendByte(uint8_t data);
+uint8_t IIC_ReadByte(uint8_t ack);
+
 #endif

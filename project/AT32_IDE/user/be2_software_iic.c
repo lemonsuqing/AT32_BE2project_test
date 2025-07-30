@@ -37,7 +37,7 @@ void BE2_IIC_Init(void)
 }
 
 // 发送起始信号
-static void IIC_Start(void)
+void IIC_Start(void)
 {
     SDA_HIGH;
     SCL_HIGH;
@@ -48,7 +48,7 @@ static void IIC_Start(void)
 }
 
 // 发送停止信号
-static void IIC_Stop(void)
+void IIC_Stop(void)
 {
     SDA_LOW;
     SCL_HIGH;
@@ -58,7 +58,7 @@ static void IIC_Stop(void)
 }
 
 // 发送应答信号（0：应答，1：非应答）
-static void IIC_SendAck(uint8_t ack)
+void IIC_SendAck(uint8_t ack)
 {
     if (ack) SDA_HIGH;
     else SDA_LOW;
@@ -71,7 +71,7 @@ static void IIC_SendAck(uint8_t ack)
 }
 
 // 等待应答信号
-static uint8_t IIC_WaitAck(void)
+uint8_t IIC_WaitAck(void)
 {
     uint8_t timeout = 0;
     SDA_HIGH;  // 释放SDA
@@ -95,7 +95,7 @@ static uint8_t IIC_WaitAck(void)
 }
 
 // 发送一个字节
-static void IIC_SendByte(uint8_t data)
+void IIC_SendByte(uint8_t data)
 {
     uint8_t i;
     for (i = 0; i < 8; i++)
@@ -112,7 +112,7 @@ static void IIC_SendByte(uint8_t data)
 }
 
 // 读取一个字节（ack：0-发送应答，1-发送非应答）
-static uint8_t IIC_ReadByte(uint8_t ack)
+uint8_t IIC_ReadByte(uint8_t ack)
 {
     uint8_t data = 0;
     uint8_t i;
