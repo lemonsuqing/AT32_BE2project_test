@@ -15,7 +15,7 @@
 #define BE2_IIC_SDA_PIN     GPIO_PINS_9
 
 // I2C地址（根据MODE0引脚设置，0x32或0x33）
-#define BE2_IIC_ADDR        0x32 << 1  // 左移1位包含读写位
+#define BE2_IIC_ADDR        0x33 << 1  // 左移1位包含读写位
 
 // 寄存器地址（参考BE2硬件手册附录）
 #define BE2_REG_ACC_X       0x24    // 加速度计X轴数据（4字节）
