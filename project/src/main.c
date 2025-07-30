@@ -191,11 +191,25 @@ int main(void)
 //  uint8_t ret;                                 // 存储读取函数的返回值
 
   BE2_I2C_TestMain();
+  float ax, ay, az;
+  uint8_t ret;
   /* add user code end 2 */
 
   while(1)
   {
     /* add user code begin 3 */
+	ret = BE2_ReadAccelerometer(&ax, &ay, &az);
+	if (ret == 0)
+	{
+	  // 20220802用户手册2.2.1节：加速度单位为g，静止时Z轴约为-1g
+	  Serial_Printf("Acc: X=%.2f g, Y=%.2f g, Z=%.2f g\r\n", ax, ay, az);
+	}
+	else
+	{
+	  Serial_Printf("Read Acc failed! Error: %d\r\n", ret);
+	}
+
+	wk_delay_ms(500);  // 每500ms读取一次（参考文档默认输出频率）
 //	  ret = BE2_ReadAccelerometer(&ax, &ay, &az);
 //	  if (ret == 0){
 //		  Serial_Printf("[Accelerometer] ax=%.2f g, ay=%.2f g, az=%.2f g\r\n", ax, ay, az);

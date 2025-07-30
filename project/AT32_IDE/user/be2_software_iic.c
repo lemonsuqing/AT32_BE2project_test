@@ -1,208 +1,140 @@
 #include "be2_software_iic.h"
+#include "wk_system.h"  // 用于延时函数
 
-// 引脚操作宏
-#define SCL_HIGH    gpio_bits_set(BE2_IIC_SCL_PORT, BE2_IIC_SCL_PIN)
-#define SCL_LOW     gpio_bits_reset(BE2_IIC_SCL_PORT, BE2_IIC_SCL_PIN)
-#define SDA_HIGH    gpio_bits_set(BE2_IIC_SDA_PORT, BE2_IIC_SDA_PIN)
-#define SDA_LOW     gpio_bits_reset(BE2_IIC_SDA_PORT, BE2_IIC_SDA_PIN)
-#define SDA_READ    gpio_input_data_bit_read(BE2_IIC_SDA_PORT, BE2_IIC_SDA_PIN)
-
-// 延时函数（确保I2C时序满足400kbit/s要求）
-static void IIC_DelayUs(uint16_t us)
+/**
+ * @brief  初始化BE2（复用OLED的I2C引脚配置，开漏输出+上拉，符合20230707硬件手册表2-3电平要求）
+ * @retval 0: 成功
+ */
+uint8_t BE2_I2C_Init(void)
 {
-    wk_delay_us(us);  // 需实现微秒级延时
+    OLED_I2C_Init();  // 复用OLED的I2C引脚初始化（已验证兼容）
+    wk_delay_ms(100); // 等待传感器上电稳定（参考20220802用户手册电源要求）
+    return 0;
 }
 
-// 初始化I2C引脚
-void BE2_IIC_Init(void)
+/**
+ * @brief  读取BE2寄存器数据（遵循I2C通信规范，参考20230707硬件手册3.3节）
+ * @param  reg_addr: 寄存器地址
+ * @param  data: 接收缓冲区
+ * @param  len: 读取长度
+ * @retval 0: 成功；1: 设备无应答；2: 寄存器地址无应答；3: 读操作无应答
+ */
+uint8_t BE2_ReadReg(uint8_t reg_addr, uint8_t *data, uint8_t len)
 {
-    gpio_init_type gpio_init_struct;
+    uint8_t i;
 
-    // 使能GPIO时钟（根据实际端口修改）
-    crm_periph_clock_enable(CRM_GPIOB_PERIPH_CLOCK, TRUE);
-
-    // 配置SCL和SDA为推挽输出
-    gpio_default_para_init(&gpio_init_struct);
-    gpio_init_struct.gpio_mode = GPIO_MODE_OUTPUT;
-    gpio_init_struct.gpio_out_type = GPIO_OUTPUT_PUSH_PULL;
-    gpio_init_struct.gpio_pull = GPIO_PULL_UP;
-    gpio_init_struct.gpio_drive_strength = GPIO_DRIVE_STRENGTH_MODERATE;
-    gpio_init_struct.gpio_pins = BE2_IIC_SCL_PIN | BE2_IIC_SDA_PIN;
-    gpio_init(BE2_IIC_SCL_PORT, &gpio_init_struct);
-
-    // 初始化为高电平
-    SCL_HIGH;
-    SDA_HIGH;
-    IIC_DelayUs(10);
-}
-
-// 发送起始信号
-void IIC_Start(void)
-{
-    SDA_HIGH;
-    SCL_HIGH;
-    IIC_DelayUs(5);
-    SDA_LOW;
-    IIC_DelayUs(5);
-    SCL_LOW;  // 拉低时钟，准备发送数据
-}
-
-// 发送停止信号
-void IIC_Stop(void)
-{
-    SDA_LOW;
-    SCL_HIGH;
-    IIC_DelayUs(5);
-    SDA_HIGH;
-    IIC_DelayUs(5);
-}
-
-// 发送应答信号（0：应答，1：非应答）
-void IIC_SendAck(uint8_t ack)
-{
-    if (ack) SDA_HIGH;
-    else SDA_LOW;
-    IIC_DelayUs(2);
-    SCL_HIGH;
-    IIC_DelayUs(5);
-    SCL_LOW;
-    SDA_HIGH;  // 释放SDA
-    IIC_DelayUs(1);
-}
-
-// 等待应答信号
-uint8_t IIC_WaitAck(void)
-{
-    uint8_t timeout = 0;
-    SDA_HIGH;  // 释放SDA
-    IIC_DelayUs(2);
-    SCL_HIGH;
-    IIC_DelayUs(2);
-
-    while (SDA_READ)
+    // 1. 发送起始信号 + 写地址
+    OLED_I2C_Start();
+    OLED_I2C_SendByte(BE2_I2C_ADDR_WRITE);
+    wk_delay_us(2);
+    // 检查设备应答（SDA拉低为应答，参考20230707硬件手册I2C时序）
+    if (OLED_W_SDA_READ() != 0)
     {
-        timeout++;
-        if (timeout > 200)
+        OLED_I2C_Stop();
+        return 1;
+    }
+
+    // 2. 发送寄存器地址
+    OLED_I2C_SendByte(reg_addr);
+    wk_delay_us(2);
+    if (OLED_W_SDA_READ() != 0)
+    {
+        OLED_I2C_Stop();
+        return 2;
+    }
+
+    // 3. 发送重复起始信号 + 读地址
+    OLED_I2C_Start();
+    OLED_I2C_SendByte(BE2_I2C_ADDR_READ);
+    wk_delay_us(2);
+    if (OLED_W_SDA_READ() != 0)
+    {
+        OLED_I2C_Stop();
+        return 3;
+    }
+
+    // 4. 读取数据（最后1字节发送非应答）
+    for (i = 0; i < len; i++)
+    {
+        // 读取1字节（高位在前，参考20230707硬件手册I2C数据传输格式）
+        data[i] = 0;
+        for (uint8_t bit = 0; bit < 8; bit++)
         {
-            IIC_Stop();
-            return 1;  // 应答超时
+            data[i] <<= 1;
+            OLED_W_SCL(1);  // 时钟拉高，读取SDA
+            wk_delay_us(2);
+            if (OLED_W_SDA_READ())
+                data[i] |= 0x01;
+            OLED_W_SCL(0);  // 时钟拉低
+            wk_delay_us(2);
         }
-        IIC_DelayUs(1);
+        // 发送应答（最后1字节非应答）
+        OLED_W_SDA(i == len - 1 ? 1 : 0);
+        wk_delay_us(2);
+        OLED_W_SCL(1);
+        wk_delay_us(2);
+        OLED_W_SCL(0);
+        OLED_W_SDA(1);  // 释放SDA
     }
-    SCL_LOW;
-    IIC_DelayUs(1);
-    return 0;  // 应答成功
+
+    // 5. 发送停止信号
+    OLED_I2C_Stop();
+    return 0;
 }
 
-// 发送一个字节
-void IIC_SendByte(uint8_t data)
-{
-    uint8_t i;
-    for (i = 0; i < 8; i++)
-    {
-        if (data & 0x80) SDA_HIGH;
-        else SDA_LOW;
-        data <<= 1;
-        IIC_DelayUs(2);
-        SCL_HIGH;
-        IIC_DelayUs(5);
-        SCL_LOW;
-        IIC_DelayUs(1);
-    }
-}
-
-// 读取一个字节（ack：0-发送应答，1-发送非应答）
-uint8_t IIC_ReadByte(uint8_t ack)
-{
-    uint8_t data = 0;
-    uint8_t i;
-
-    for (i = 0; i < 8; i++)
-    {
-        data <<= 1;
-        SCL_HIGH;
-        IIC_DelayUs(3);
-        if (SDA_READ) data |= 0x01;
-        SCL_LOW;
-        IIC_DelayUs(1);
-    }
-    IIC_SendAck(ack);
-    return data;
-}
-
-// 读取寄存器数据
-uint8_t BE2_IIC_ReadReg(uint8_t reg_addr, uint8_t *data, uint16_t len)
-{
-    IIC_Start();
-    IIC_SendByte(BE2_IIC_ADDR);  // 发送写地址
-    if (IIC_WaitAck())
-    {
-        IIC_Stop();
-        return 1;  // 设备无应答
-    }
-
-    IIC_SendByte(reg_addr);  // 发送寄存器地址
-    if (IIC_WaitAck())
-    {
-        IIC_Stop();
-        return 2;  // 寄存器地址无应答
-    }
-
-    IIC_Start();
-    IIC_SendByte(BE2_IIC_ADDR | 0x01);  // 发送读地址
-    if (IIC_WaitAck())
-    {
-        IIC_Stop();
-        return 3;  // 读操作无应答
-    }
-
-    // 读取数据
-    for (uint16_t i = 0; i < len; i++)
-    {
-        // 最后一个字节发送非应答
-        data[i] = IIC_ReadByte((i == len - 1) ? 1 : 0);
-    }
-
-    IIC_Stop();
-    return 0;  // 成功
-}
-
-// 读取加速度计数据（单位：g）
+/**
+ * @brief  读取加速度计数据（单位：g，静止时Z轴约为-1g，参考20220802用户手册2.2.1）
+ */
 uint8_t BE2_ReadAccelerometer(float *ax, float *ay, float *az)
 {
-    uint8_t buf[12];  // X、Y、Z各4字节
-    uint8_t ret = BE2_IIC_ReadReg(BE2_REG_ACC_X, buf, 12);
-    if (ret != 0) return ret;
+    uint8_t buf[4];  // 32位浮点型（小端格式，参考20230707硬件手册数据格式）
 
-    // 转换为float（小端格式）
-    *ax = *(float *)&buf[0];
-    *ay = *(float *)&buf[4];
-    *az = *(float *)&buf[8];
+    if (BE2_ReadReg(BE2_REG_ACC_X, buf, 4) != 0) return 1;
+    *ax = *(float *)buf;
+
+    if (BE2_ReadReg(BE2_REG_ACC_Y, buf, 4) != 0) return 2;
+    *ay = *(float *)buf;
+
+    if (BE2_ReadReg(BE2_REG_ACC_Z, buf, 4) != 0) return 3;
+    *az = *(float *)buf;
+
     return 0;
 }
 
-// 读取陀螺仪数据（单位：dps）
+/**
+ * @brief  读取陀螺仪数据（单位：dps，静止时接近0，参考20220802用户手册2.2.2）
+ */
 uint8_t BE2_ReadGyroscope(float *gx, float *gy, float *gz)
 {
-    uint8_t buf[12];
-    uint8_t ret = BE2_IIC_ReadReg(BE2_REG_GYR_X, buf, 12);
-    if (ret != 0) return ret;
+    uint8_t buf[4];
 
-    *gx = *(float *)&buf[0];
-    *gy = *(float *)&buf[4];
-    *gz = *(float *)&buf[8];
+    if (BE2_ReadReg(BE2_REG_GYR_X, buf, 4) != 0) return 1;
+    *gx = *(float *)buf;
+
+    if (BE2_ReadReg(BE2_REG_GYR_Y, buf, 4) != 0) return 2;
+    *gy = *(float *)buf;
+
+    if (BE2_ReadReg(BE2_REG_GYR_Z, buf, 4) != 0) return 3;
+    *gz = *(float *)buf;
+
     return 0;
 }
 
-// 读取欧拉角数据（单位：度）
+/**
+ * @brief  读取欧拉角数据（单位：度，参考20220802用户手册2.3.2，注意pitch±90°奇点问题）
+ */
 uint8_t BE2_ReadEulerAngle(float *roll, float *pitch, float *yaw)
 {
-    uint8_t buf[12];
-    uint8_t ret = BE2_IIC_ReadReg(BE2_REG_EULER_X, buf, 12);
-    if (ret != 0) return ret;
+    uint8_t buf[4];
 
-    *roll = *(float *)&buf[0];   // 横滚角
-    *pitch = *(float *)&buf[4];  // 俯仰角
-    *yaw = *(float *)&buf[8];    // 偏航角
+    if (BE2_ReadReg(BE2_REG_EULER_X, buf, 4) != 0) return 1;
+    *roll = *(float *)buf;
+
+    if (BE2_ReadReg(BE2_REG_EULER_Y, buf, 4) != 0) return 2;
+    *pitch = *(float *)buf;
+
+    if (BE2_ReadReg(BE2_REG_EULER_Z, buf, 4) != 0) return 3;
+    *yaw = *(float *)buf;
+
     return 0;
 }

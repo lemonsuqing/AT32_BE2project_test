@@ -5,36 +5,31 @@
 #include "i2c_application.h"
 #include "wk_system.h"
 #include "wk_gpio.h"
+#include "oled.h"
 #include <stddef.h>
 #include <stdint.h>
 
-// 引脚定义（可根据实际硬件修改）
-#define BE2_IIC_SCL_PORT    GPIOB
-#define BE2_IIC_SDA_PORT    GPIOB
-#define BE2_IIC_SCL_PIN     GPIO_PINS_8
-#define BE2_IIC_SDA_PIN     GPIO_PINS_9
+// BE2 I2C地址（参考20230707硬件手册表3-1：MODE0=0时为0x32）
+#define BE2_I2C_ADDR_WRITE   0x64  // 0x32 << 1（写操作）
+#define BE2_I2C_ADDR_READ    0x65  // 0x32 << 1 | 1（读操作）
 
-// I2C地址（根据MODE0引脚设置，0x32或0x33）
-#define BE2_IIC_ADDR        0x32 << 1  // 左移1位包含读写位
-
-// 寄存器地址（参考BE2硬件手册附录）
-#define BE2_REG_ACC_X       0x24    // 加速度计X轴数据（4字节）
-#define BE2_REG_GYR_X       0x30    // 陀螺仪X轴数据（4字节）
-#define BE2_REG_QUAT_W      0x48    // 四元数W（4字节）
-#define BE2_REG_EULER_X     0x58    // 欧拉角X（4字节）
+// 寄存器地址（参考20230707硬件手册附录寄存器映射）
+#define BE2_REG_ACC_X        0x24  // 加速度计X轴（4字节，小端浮点）
+#define BE2_REG_ACC_Y        0x28  // 加速度计Y轴
+#define BE2_REG_ACC_Z        0x2C  // 加速度计Z轴
+#define BE2_REG_GYR_X        0x30  // 陀螺仪X轴（4字节，小端浮点）
+#define BE2_REG_GYR_Y        0x34  // 陀螺仪Y轴
+#define BE2_REG_GYR_Z        0x38  // 陀螺仪Z轴
+#define BE2_REG_EULER_X      0x58  // 欧拉角X（横滚角，4字节浮点）
+#define BE2_REG_EULER_Y      0x5C  // 欧拉角Y（俯仰角）
+#define BE2_REG_EULER_Z      0x60  // 欧拉角Z（偏航角）
 
 // 函数声明
-void BE2_IIC_Init(void);
-uint8_t BE2_IIC_ReadReg(uint8_t reg_addr, uint8_t *data, uint16_t len);
-uint8_t BE2_ReadAccelerometer(float *ax, float *ay, float *az);
-uint8_t BE2_ReadGyroscope(float *gx, float *gy, float *gz);
-uint8_t BE2_ReadEulerAngle(float *roll, float *pitch, float *yaw);
+uint8_t BE2_I2C_Init(void);  // 初始化BE2（复用OLED的I2C引脚配置）
+uint8_t BE2_ReadReg(uint8_t reg_addr, uint8_t *data, uint8_t len);  // 读取寄存器
+uint8_t BE2_ReadAccelerometer(float *ax, float *ay, float *az);     // 读取加速度计（单位：g，参考20220802用户手册2.2.1）
+uint8_t BE2_ReadGyroscope(float *gx, float *gy, float *gz);         // 读取陀螺仪（单位：dps，参考20220802用户手册2.2.2）
+uint8_t BE2_ReadEulerAngle(float *roll, float *pitch, float *yaw);  // 读取欧拉角（单位：度，参考20220802用户手册2.3.2）
 
-void IIC_Start(void);
-void IIC_Stop(void);
-void IIC_SendAck(uint8_t ack);
-uint8_t IIC_WaitAck(void);
-void IIC_SendByte(uint8_t data);
-uint8_t IIC_ReadByte(uint8_t ack);
 
 #endif
