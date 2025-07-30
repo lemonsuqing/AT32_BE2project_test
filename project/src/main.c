@@ -42,11 +42,7 @@
 
 /* private typedef -----------------------------------------------------------*/
 /* add user code begin private typedef */
-i2c_handle_type hi2c = {
-    .i2cx = I2C2,  // 绑定到I2C2外设
-    .dma_tx_channel = NULL,  // 不使用DMA时设为NULL
-    .dma_rx_channel = NULL
-};
+
 /* add user code end private typedef */
 
 /* private define ------------------------------------------------------------*/
@@ -66,7 +62,7 @@ i2c_handle_type hi2c = {
 
 /* private function prototypes --------------------------------------------*/
 /* add user code begin function prototypes */
-#define OLED_TIMEOUT 1000
+
 /* add user code end function prototypes */
 
 /* private user code ---------------------------------------------------------*/
@@ -111,38 +107,20 @@ int main(void)
 
   /* add user code begin 2 */
   wk_delay_ms(100);
-  OLED_Init(&hi2c);
-
-  // 显示测试内容
-  OLED_ShowString(0, 0, "AT32F405");
-  OLED_ShowString(0, 2, "OLED Test");
-  OLED_ShowNumber(0, 4, 123456, 6);
-
-
-//  BE2_I2C_Init();    // 初始化BE2的I2C通信
-//  wk_delay_ms(100);  // 等待传感器上电稳定
-
-
-//  if(BE2_Init() != 0)
-//  {
-//	Serial_Printf("Sensor init failed!\r\n");
-//	while(1);  // 初始化失败时阻塞
-//  }
+  OLED_Init();
 
   /* add user code end 2 */
 
   while(1)
   {
     /* add user code begin 3 */
-//  if(BE2_ReadAllData(&sensor_data) == 0)  // 读取传感器数据
-//  {
-//	BE2_PrintData(&sensor_data);  // 通过串口打印数据
-//  }
-//  else
-//  {
-//	Serial_Printf("Data read failed!\r\n");
-//  }
-  wk_delay_ms(200);  // 控制读取频率（与手册中默认100Hz输出兼容）
+	OLED_ShowChar(1,1,'A');//显示一个字符
+	OLED_ShowString(1,3,"HelloWorld");//显示字符串
+	OLED_ShowNum(2,1,12345,5);//显示无符号十进制数
+	OLED_ShowSignedNum(2,7,-66,2);//显示有符号十进制数
+	OLED_ShowHexNum(3,1,0XAA66,4);//显示16进制数字
+	OLED_ShowBinNum(4,1,0XAA55,16);//显示二进制
+//  wk_delay_ms(200);  // 控制读取频率（与手册中默认100Hz输出兼容）
     /* add user code end 3 */
   }
 }
