@@ -116,9 +116,9 @@ int main(void)
   IIC_SendByte(BE2_IIC_ADDR);  // 发送写地址（如 0x32<<1=0x64）
   uint8_t ack = IIC_WaitAck();
   if (ack == 0) {
-	  printf("设备地址应答正常！\n");
+	  Serial_Printf("设备地址应答正常！\n");
   } else {
-	  printf("设备无应答！检查地址、接线、供电\n");
+	  Serial_Printf("设备无应答！检查地址、接线、供电\n");
   }
   IIC_Stop();
 
