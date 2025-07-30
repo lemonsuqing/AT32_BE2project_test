@@ -29,6 +29,7 @@ void wk_i2c_write_byte(uint8_t addr, uint8_t data)
 
     // 使用wk库I2C发送函数
     status = i2c_master_transmit(&hi2c2, OLED_I2C_ADDRESS, tx_buf, 2, 1000);
+    Serial_Printf("I2C addr=%02X, data=%02X, status=%d\n", OLED_I2C_ADDRESS, data, status);
     if (status != I2C_OK)
     {
         // 可添加错误处理（如I2C重置）
