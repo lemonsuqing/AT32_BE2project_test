@@ -32,5 +32,6 @@ uint8_t BE2_EnableSensors(void);                // 使能传感器数据输出
 uint8_t BE2_ReadAccelerometer(float *ax, float *ay, float *az);     // 读取加速度计
 uint8_t BE2_ReadGyroscope(float *gx, float *gy, float *gz);         // 读取陀螺仪
 uint8_t BE2_ReadEulerAngle(float *roll, float *pitch, float *yaw);  // 读取欧拉角
+uint8_t BE2_EnterStreamingMode(void);
 
 #endif

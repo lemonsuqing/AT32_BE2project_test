@@ -1,5 +1,5 @@
 #include "be2_software_iic.h"
-
+#include <string.h>
 /**
  * @brief  初始化BE2（复用OLED的I2C引脚）
  * @retval 0: 成功
@@ -100,12 +100,31 @@ uint8_t BE2_ReadReg(uint8_t reg_addr, uint8_t *data, uint8_t len)
  */
 uint8_t BE2_EnableSensors(void)
 {
-    // 使能加速度计、陀螺仪（DATA_ENABLE寄存器：Bit5=1, Bit6=1）
-    if (BE2_WriteReg(BE2_REG_DATA_ENABLE, 0x60) != 0) return 1;
-    // 配置加速度计输出原始数据（CTRL0_A：Bit4=0）
-    if (BE2_WriteReg(BE2_REG_CTRL0_A, 0x00) != 0) return 2;
-    wk_delay_ms(50);
+    // 1. 数据使能寄存器（0x04）：Bit5=ACC, Bit6=GYR, Bit7=EULER（全使能）
+    if (BE2_WriteReg(BE2_REG_DATA_ENABLE, 0xE0) != 0) return 1;
+
+    // 2. 模式控制寄存器（0x00）：确保处于正常工作模式（非待机）
+    // 参考硬件手册6.2节：0x00=正常模式，0x01=待机模式
+    if (BE2_WriteReg(0x00, 0x00) != 0) return 2;
+
+    // 3. 输出速率配置（0x02）：设置为100Hz（默认值0x03，可选）
+    if (BE2_WriteReg(0x02, 0x03) != 0) return 3;
+
+    wk_delay_ms(100);  // 等待配置生效
     return 0;
+}
+
+float BE2_BytesToFloat(uint8_t *bytes)
+{
+    float f;
+    uint8_t tmp[4];
+    // 小端格式：buf[0]=LSB，buf[3]=MSB
+    tmp[0] = bytes[3];  // 高字节
+    tmp[1] = bytes[2];
+    tmp[2] = bytes[1];
+    tmp[3] = bytes[0];  // 低字节
+    memcpy(&f, tmp, 4);
+    return f;
 }
 
 /**
@@ -116,13 +135,13 @@ uint8_t BE2_ReadAccelerometer(float *ax, float *ay, float *az)
 {
     uint8_t buf[4];
     if (BE2_ReadReg(BE2_REG_ACC_X, buf, 4) != 0) return 1;
-    *ax = *(float *)buf;
+    *ax = BE2_BytesToFloat(buf);  // 替换直接转换
 
     if (BE2_ReadReg(BE2_REG_ACC_Y, buf, 4) != 0) return 2;
-    *ay = *(float *)buf;
+    *ay = BE2_BytesToFloat(buf);
 
     if (BE2_ReadReg(BE2_REG_ACC_Z, buf, 4) != 0) return 3;
-    *az = *(float *)buf;
+    *az = BE2_BytesToFloat(buf);
 
     return 0;
 }
@@ -162,5 +181,13 @@ uint8_t BE2_ReadEulerAngle(float *roll, float *pitch, float *yaw)
     if (BE2_ReadReg(BE2_REG_EULER_Z, buf, 4) != 0) return 3;
     *yaw = *(float *)buf;
 
+    return 0;
+}
+
+uint8_t BE2_EnterStreamingMode(void)
+{
+    // 发送GOTO_STREAMING_MODE指令（0x07），参考用户手册3.5节
+    if (BE2_WriteReg(0xFF, 0x07) != 0) return 1;  // 0xFF为指令寄存器
+    wk_delay_ms(50);
     return 0;
 }
