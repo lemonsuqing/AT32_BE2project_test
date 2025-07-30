@@ -200,7 +200,12 @@ int main(void)
 //  OLED_ShowHexNum(3,1,0XAA66,4);//显示16进制数字
 //  OLED_ShowBinNum(4,1,0XAA55,16);//显示二进制
   BE2_I2C_Init();
-  BE2_Test_WhoAmI();
+
+  gpio_bits_write(GPIOB, GPIO_PINS_8, RESET); // 拉低
+  wk_delay_ms(1000);
+  gpio_bits_write(GPIOB, GPIO_PINS_8, SET);   // 拉高
+
+//  BE2_Test_WhoAmI();
 
   /* add user code end 2 */
 
