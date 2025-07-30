@@ -3,7 +3,7 @@
 #define BE2_I2C_ADDR       0x32
 
 static void delay_us(uint16_t us) {
-    wk_delay_us(us);
+    wk_delay_us(us*5);
 }
 
 static void i2c_start(void) {
@@ -217,3 +217,18 @@ void BE2_Test_WhoAmI(void) {
     }
     Serial_Printf("===== WHOAMI test completed =====\r\n");
 }
+
+void scan_addr(void){
+	for(uint8_t addr = 0x30; addr <= 0x3F; addr++) {
+		Serial_Printf("\n[SCAN] Trying 7-bit address: 0x%02X (Write: 0x%02X)\n", addr, (addr << 1) | 0);
+		i2c_start();
+		i2c_send_byte((addr << 1) | 0);
+		if (i2c_wait_ack()) {
+			Serial_Printf(">>> Found device at 0x%02X <<<\n", addr);
+			i2c_stop();
+			break;
+		}
+		i2c_stop();
+	}
+}
+

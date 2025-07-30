@@ -12,8 +12,8 @@
 /* 引脚定义 */
 #define BE2_SCL_PORT     GPIOB
 #define BE2_SDA_PORT     GPIOB
-#define BE2_SCL_PIN      GPIO_PINS_8
-#define BE2_SDA_PIN      GPIO_PINS_9
+#define BE2_SCL_PIN      GPIO_PINS_6
+#define BE2_SDA_PIN      GPIO_PINS_7
 
 /* 宏操作 */
 #define BE2_SCL_H()      gpio_bits_write(BE2_SCL_PORT, BE2_SCL_PIN, SET)
@@ -27,5 +27,6 @@ void BE2_I2C_Init(void);
 uint8_t BE2_I2C_CheckDevice(void);
 uint8_t BE2_I2C_ReadReg(uint8_t reg);
 void BE2_Test_WhoAmI(void);
+void scan_addr(void);
 
 #endif

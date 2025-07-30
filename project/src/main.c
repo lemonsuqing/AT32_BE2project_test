@@ -201,12 +201,12 @@ int main(void)
 //  OLED_ShowBinNum(4,1,0XAA55,16);//显示二进制
   BE2_I2C_Init();
 
-  gpio_bits_write(GPIOB, GPIO_PINS_8, RESET); // 拉低
-  wk_delay_ms(1000);
-  gpio_bits_write(GPIOB, GPIO_PINS_8, SET);   // 拉高
+//  gpio_bits_write(GPIOB, GPIO_PINS_8, RESET); // 拉低
+//  wk_delay_ms(1000);
+//  gpio_bits_write(GPIOB, GPIO_PINS_8, SET);   // 拉高
 
-//  BE2_Test_WhoAmI();
-
+  BE2_Test_WhoAmI();
+  scan_addr();
   /* add user code end 2 */
 
   while(1)
