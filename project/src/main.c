@@ -191,6 +191,13 @@ int main(void)
 //  uint8_t ret;                                 // 存储读取函数的返回值
 
   BE2_I2C_TestMain();
+  BE2_I2C_Init();                // 初始化I2C引脚（复用OLED配置）
+  uint8_t enable_ret = BE2_EnableSensors();  // 使能传感器数据输出
+  if (enable_ret != 0)
+  {
+	Serial_Printf("传感器使能失败！错误码: %d\r\n", enable_ret);
+	while(1);  // 初始化失败时挂起
+  }
   float ax, ay, az;
   uint8_t ret;
   /* add user code end 2 */
