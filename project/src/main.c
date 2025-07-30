@@ -199,7 +199,8 @@ int main(void)
 //  OLED_ShowSignedNum(2,7,-66,2);//显示有符号十进制数
 //  OLED_ShowHexNum(3,1,0XAA66,4);//显示16进制数字
 //  OLED_ShowBinNum(4,1,0XAA55,16);//显示二进制
-  be2_test();
+  BE2_I2C_Init();
+  BE2_Test_WhoAmI();
 
   /* add user code end 2 */
 
