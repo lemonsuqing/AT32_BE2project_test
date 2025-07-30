@@ -37,8 +37,8 @@
 #include "Serial.h"
 //#include "be2_spi.h"
 //#include "be2_iic.h"
-//#include "oled.h"
-#include "hardware_oled.h"
+#include "oled.h"
+//#include "hardware_oled.h"
 #include "i2c_application.h"
 #include "be2_software_iic.h"
 /* add user code end private includes */
@@ -65,7 +65,72 @@
 
 /* private function prototypes --------------------------------------------*/
 /* add user code begin function prototypes */
+uint8_t BE2_TestAddress(uint8_t be2_addr)
+{
+    uint8_t ack = 1; // 默认为无响应
+    uint8_t i;
 
+    // 1. 发送I2C起始信号（复用OLED的起始函数，符合I2C时序）
+    OLED_I2C_Start();
+
+    // 2. 发送BE2的I2C写地址（7位地址+写位0）
+    for (i = 0; i < 8; i++)
+    {
+        OLED_W_SDA(be2_addr & (0x80 >> i)); // 按位发送地址
+        wk_delay_us(2);                       // 延时符合手册中I2C电平有效时间（≥1μs）
+        OLED_W_SCL(1);                      // 时钟拉高，从机采样
+        wk_delay_us(2);
+
+        // 第8位（最低位）发送后，检查从机应答（ACK）
+        if (i == 7)
+        {
+            OLED_W_SDA(1); // 释放SDA，准备接收应答
+            wk_delay_us(2);
+            if (OLED_W_SDA_READ() == 0) // 若SDA被拉低，说明有应答
+            {
+                ack = 0;
+            }
+        }
+
+        OLED_W_SCL(0); // 时钟拉低，准备下一位
+        wk_delay_us(2);
+    }
+
+    // 3. 发送I2C停止信号
+    OLED_I2C_Stop();
+
+    return ack;
+}
+
+/**
+ * @brief  BE2地址测试主函数（需在main中调用）
+ */
+void BE2_I2C_TestMain(void)
+{
+    // 初始化I2C引脚（复用OLED的初始化，开漏输出+上拉，符合I2C标准）
+    OLED_I2C_Init();
+    wk_delay_ms(100); // 等待传感器上电稳定
+
+    // 根据BE2的MODE0引脚状态选择地址（参考20230707硬件手册表3-1）
+    // 若MODE0接GND：地址为0x32<<1=0x64；若接VCC：地址为0x33<<1=0x66
+    uint8_t test_addr = 0x64; // 替换为实际地址
+
+    // 执行地址测试
+    uint8_t result = BE2_TestAddress(test_addr);
+
+    // 打印测试结果
+    if (result == 0)
+    {
+        Serial_Printf("BE2地址0x%02X响应正常！\n", test_addr);
+    }
+    else
+    {
+        Serial_Printf("BE2地址0x%02X无响应，请检查：\n", test_addr);
+        Serial_Printf("1. MODE1是否接高电平（I2C模式）\n");
+        Serial_Printf("2. MODE0电平与地址是否匹配\n");
+        Serial_Printf("3. 接线（SCL/SDA是否接反、GND是否共地）\n");
+    }
+}
 /* add user code end function prototypes */
 
 /* private user code ---------------------------------------------------------*/
@@ -110,25 +175,22 @@ int main(void)
 
   /* add user code begin 2 */
   wk_delay_ms(100);
-  BE2_IIC_Init();  // 配置 SCL/SDA 引脚为推挽输出、上拉，初始化时序
+//  OLED_Init();
+//
+//  OLED_ShowChar(1,1,'A');//显示一个字符
+//  OLED_ShowString(1,3,"HelloWorld");//显示字符串
+//  OLED_ShowNum(2,1,12345,5);//显示无符号十进制数
+//  OLED_ShowSignedNum(2,7,-66,2);//显示有符号十进制数
+//  OLED_ShowHexNum(3,1,0XAA66,4);//显示16进制数字
+//  OLED_ShowBinNum(4,1,0XAA55,16);//显示二进制
 
-  IIC_Start();
-  IIC_SendByte(BE2_IIC_ADDR);  // 发送写地址（如 0x32<<1=0x64）
-  uint8_t ack = IIC_WaitAck();
-  if (ack == 0) {
-	  Serial_Printf("设备地址应答正常！\n");
-  } else {
-	  Serial_Printf("设备无应答！检查地址、接线、供电\n");
-  }
-  IIC_Stop();
-
-  while(1);
 
 //  float ax = 0.0f, ay = 0.0f, az = 0.0f;       // 加速度计数据（单位：g）
 //  float gx = 0.0f, gy = 0.0f, gz = 0.0f;       // 陀螺仪数据（单位：dps）
 //  float roll = 0.0f, pitch = 0.0f, yaw = 0.0f; // 欧拉角数据（单位：度）
 //  uint8_t ret;                                 // 存储读取函数的返回值
 
+  BE2_I2C_TestMain();
   /* add user code end 2 */
 
   while(1)
