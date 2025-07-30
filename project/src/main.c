@@ -198,23 +198,48 @@ int main(void)
 	Serial_Printf("传感器使能失败！错误码: %d\r\n", enable_ret);
 	while(1);  // 初始化失败时挂起
   }
-  float ax, ay, az;
-  uint8_t ret;
+  float ax, ay, az;       // 加速度计数据
+  float gx, gy, gz;       // 陀螺仪数据
+  float roll, pitch, yaw; // 欧拉角数据
+  uint8_t read_ret;       // 读取结果
   /* add user code end 2 */
 
   while(1)
   {
     /* add user code begin 3 */
-	ret = BE2_ReadAccelerometer(&ax, &ay, &az);
-	if (ret == 0)
-	{
-	  // 20220802用户手册2.2.1节：加速度单位为g，静止时Z轴约为-1g
-	  Serial_Printf("Acc: X=%.2f g, Y=%.2f g, Z=%.2f g\r\n", ax, ay, az);
-	}
-	else
-	{
-	  Serial_Printf("Read Acc failed! Error: %d\r\n", ret);
-	}
+	  // 读取加速度计
+	  read_ret = BE2_ReadAccelerometer(&ax, &ay, &az);
+	  if (read_ret == 0)
+	  {
+		  Serial_Printf("加速度: X=%.2f g, Y=%.2f g, Z=%.2f g\r\n", ax, ay, az);
+	  }
+	  else
+	  {
+		  Serial_Printf("加速度读取失败！错误码: %d\r\n", read_ret);
+	  }
+
+	  // 读取陀螺仪
+	  read_ret = BE2_ReadGyroscope(&gx, &gy, &gz);
+	  if (read_ret == 0)
+	  {
+		  Serial_Printf("陀螺仪: X=%.2f dps, Y=%.2f dps, Z=%.2f dps\r\n", gx, gy, gz);
+	  }
+	  else
+	  {
+		  Serial_Printf("陀螺仪读取失败！错误码: %d\r\n", read_ret);
+	  }
+
+	  // 读取欧拉角
+	  read_ret = BE2_ReadEulerAngle(&roll, &pitch, &yaw);
+	  if (read_ret == 0)
+	  {
+		  Serial_Printf("欧拉角: 横滚=%.2f °, 俯仰=%.2f °, 偏航=%.2f °\r\n", roll, pitch, yaw);
+	  }
+	  else
+	  {
+		  Serial_Printf("欧拉角读取失败！错误码: %d\r\n", read_ret);
+	  }
+
 
 	wk_delay_ms(500);  // 每500ms读取一次（参考文档默认输出频率）
 //	  ret = BE2_ReadAccelerometer(&ax, &ay, &az);
