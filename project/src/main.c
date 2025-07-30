@@ -71,6 +71,13 @@ void I2C_Scan_WK(i2c_type *i2c) {
     Serial_Printf("Starting I2C Scan (WK Library)...\r\n");
     for (addr = 0x08; addr <= 0x77; addr++) {
         timeout = 100000; // 超时计数，约100ms
+        while (i2c_flag_get(i2c, I2C_BUSYF_FLAG) != RESET && timeout--) {
+			wk_delay_us(1);
+		}
+		if (timeout == 0) {
+			Serial_Printf("Bus busy, skip addr 0x%02X\r\n", addr);
+			continue;
+		}
 
         // 生成起始信号
         i2c_start_generate(i2c);
